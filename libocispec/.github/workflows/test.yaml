@@ -1,0 +1,71 @@
+name: Test
+
+on: [push, pull_request]
+
+jobs:
+  build_job:
+    runs-on: ubuntu-latest
+    name: Build on ${{ matrix.arch }}
+
+    strategy:
+      matrix:
+        include:
+          - arch: armv7
+            distro: ubuntu_latest
+          - arch: aarch64
+            distro: ubuntu_latest
+          - arch: s390x
+            distro: ubuntu_latest
+          - arch: ppc64le
+            distro: ubuntu_latest
+    steps:
+      - uses: actions/checkout@v3.0.2
+        with:
+          submodules: true
+          set-safe-directory: true
+
+      - uses: uraimo/run-on-arch-action@v2.2.0
+        name: Build
+        id: build
+        with:
+          arch: ${{ matrix.arch }}
+          distro: ${{ matrix.distro }}
+
+          githubToken: ${{ github.token }}
+
+          setup: |
+            git submodule update --init --recursive
+
+          install: |
+            apt-get update -q -y
+            apt-get install -q -y python3 automake libtool autotools-dev git make cmake pkg-config gcc wget libyajl-dev
+
+          run: |
+            find $(pwd) -name '.git' -exec bash -c 'git config --global --add safe.directory ${0%/.git}' {} \;
+            ./autogen.sh
+            ./configure CFLAGS='-Wall -Wextra -Werror'
+            make -j $(nproc) distcheck
+            # check that the working dir is clean
+            git describe --broken --dirty --all | grep -qv dirty
+
+            make clean
+            ./configure --enable-embedded-yajl CFLAGS='-Wall -Wextra -Werror'
+            make -j $(nproc) distcheck
+            # check that the working dir is clean
+            git describe --broken --dirty --all | grep -qv dirty
+  test_and_build_rust_bindings:
+    name: test and build rust bindings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --lib
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --all-features

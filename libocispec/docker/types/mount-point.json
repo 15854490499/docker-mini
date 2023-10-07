@@ -1,0 +1,30 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "type": "object",
+    "properties": {
+        "Type":{
+            "type":"string"
+        },
+        "Name":{
+            "type":"string"
+        },
+        "Source":{
+            "type":"string"
+        },
+        "Destination":{
+            "type":"string"
+        },
+        "Driver":{
+            "type":"string"
+        },
+        "Mode":{
+            "type":"string"
+        },
+        "RW":{
+            "type":"boolean"
+        },
+        "Propagation":{
+            "type":"string"
+        }
+    }
+}

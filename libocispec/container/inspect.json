@@ -1,0 +1,226 @@
+{
+    "description": "Container Inspect Specification",
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "title": "container inspect",
+    "type": "object",
+    "properties": {
+        "Id": {
+            "type": "string"
+        },
+        "Created": {
+            "type": "string"
+        },
+        "Path": {
+            "type": "string"
+        },
+        "Args": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "State": {
+            "type": "object",
+            "properties": {
+                "Status": {
+                    "type": "string"
+                },
+                "Running": {
+                    "type": "boolean"
+                },
+                "Paused": {
+                    "type": "boolean"
+                },
+                "Restarting": {
+                    "type": "boolean"
+                },
+                "Pid": {
+                    "type": "integer"
+                },
+                "ExitCode": {
+                    "type": "integer"
+                },
+                "Error": {
+                    "type": "string"
+                },
+                "StartedAt": {
+                    "type": "string"
+                },
+                "FinishedAt": {
+                    "type": "string"
+                },
+                "Health": {
+                    "$ref": "../defs.json#/definitions/Health"
+                }
+            }
+        },
+        "Resources": {
+            "type": "object",
+            "properties": {
+                "CPUPeriod": {
+                    "type": "int64"
+                },
+                "CPUQuota": {
+                    "type": "int64"
+                },
+                "CPUShares": {
+                    "type": "int64"
+                },
+                "Memory": {
+                    "type": "int64"
+                },
+                "MemorySwap": {
+                    "type": "int64"
+                },
+                "Hugetlbs": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "PageSize": {
+                                "type": "string"
+                            },
+                            "Limit": {
+                                "type": "uint64"
+                            }
+                        }
+                    }
+                },
+                "unified": {
+                    "$ref": "../defs.json#/definitions/mapStringString"
+                }
+            }
+        },
+        "Image": {
+            "type": "string"
+        },
+        "ResolvConfPath": {
+            "type": "string"
+        },
+        "HostnamePath": {
+            "type": "string"
+        },
+        "HostsPath": {
+            "type": "string"
+        },
+        "LogPath": {
+            "type": "string"
+        },
+        "Name": {
+            "type": "string"
+        },
+        "RestartCount": {
+            "type": "integer"
+        },
+        "MountLabel": {
+            "type": "string"
+        },
+        "ProcessLabel": {
+            "type": "string"
+        },
+        "SeccompProfile": {
+            "type": "string"
+        },
+        "NoNewPrivileges": {
+            "type": "boolean"
+        },
+        "GraphDriver": {
+            "type": "object",
+            "properties": {
+                "Data": {
+                    "type": "object",
+                    "properties": {
+                        "LowerDir": {
+                            "type": "string"
+                        },
+                        "MergedDir": {
+                            "type": "string"
+                        },
+                        "UpperDir": {
+                            "type": "string"
+                        },
+                        "WorkDir": {
+                            "type": "string"
+                        },
+                        "DeviceId": {
+                            "type": "string"
+                        },
+                        "DeviceName": {
+                            "type": "string"
+                        },
+                        "DeviceSize": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "Name": {
+                    "type": "string"
+                }
+            }
+        },
+        "Mounts": {
+            "type": "array",
+            "items": {
+                "$ref": "../docker/types/mount-point.json"
+            }
+        },
+        "Config": {
+            "type": "object",
+            "properties": {
+                "Hostname": {
+                    "type": "string"
+                },
+                "User": {
+                    "type": "string"
+                },
+                "Env": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "Tty": {
+                    "type": "boolean"
+                },
+                "Cmd": {
+                    "$ref": "../defs.json#/definitions/ArrayOfStrings"
+                },
+                "Entrypoint": {
+                    "$ref": "../defs.json#/definitions/ArrayOfStrings"
+                },
+                "Labels": {
+                    "$ref": "../defs.json#/definitions/mapStringString"
+                },
+                "Volumes": {
+                    "$ref": "../defs.json#/definitions/mapStringObject"
+                },
+                "Annotations": {
+                    "$ref": "../defs.json#/definitions/mapStringString"
+                },
+                "HealthCheck": {
+                    "$ref": "../defs.json#/definitions/HealthCheck"
+                },
+                "Image": {
+                    "type": "string"
+                },
+                "ImageRef": {
+                    "type": "string"
+                },
+                "StopSignal": {
+                    "type": "string"
+                }
+            }
+        },
+        "NetworkSettings": {
+            "$ref": "network-settings.json"
+        }
+    },
+    "required": [
+        "Id",
+        "Name",
+        "State",
+        "RestartCount",
+        "HostConfig",
+        "NetworkSettings"
+    ]
+}

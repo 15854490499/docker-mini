@@ -22,7 +22,7 @@
  */
 #define _GNU_SOURCE
 #include <stdio.h>
-#undef _GNU_SOURCe
+#undef _GNU_SOURCE
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
