@@ -130,18 +130,18 @@ static int update_layer_datas(const char *id, const struct layer_opts *opts, lay
             ret = -1;
             goto free_out;
         }
-    }    
+    }
     for (i = 0; i < opts->names_len; i++) {
         slayer->names[i] = strdup_s(opts->names[i]);
         slayer->names_len++;
-    }    
+    }
     slayer->diff_digest = strdup_s(opts->uncompressed_digest);
     slayer->compressed_diff_digest = strdup_s(opts->compressed_digest);
     l->layer_json_path = layer_json_path(id);
     if (l->layer_json_path == NULL) {
         ret = -1;
         goto free_out;
-    }    
+    }
 
     l->slayer = slayer;
 
@@ -428,7 +428,6 @@ static int new_layer_by_opts(const char *id, const struct layer_opts *opts) {
 out:
 	return ret;
 }
-
 
 static int make_tar_split_file(const char *lid, const struct io_read_wrapper *diff, int64_t *size)
 {

@@ -47,7 +47,7 @@
  */
 struct nl_handler {
         int fd;
-	int seq;
+		int seq;
         struct sockaddr_nl local;
         struct sockaddr_nl peer;
 };

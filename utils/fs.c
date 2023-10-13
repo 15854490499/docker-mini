@@ -190,9 +190,11 @@ static bool is_remount(const char *src, unsigned long mntflags)
 }
 
 int force_mount(const char *src, const char *dst, const char *mtype, unsigned long mntflags, const char *mntdata) {
+	printf("===============force_mount===================\n");
 	int ret = 0;
 	unsigned long oflags = mntflags & (~PROPAGATION_TYPES);
 	if(!is_remount(src, mntflags) || (mntdata != NULL && strcmp(mntdata, "") != 0)) {
+		printf("%s %s %s %s\n", src, dst, mtype, mntdata);
 		ret = mount(src, dst, mtype, oflags, mntdata);
 		if(ret < 0) {
 			printf("Failed to mount %s to %s:%s\n", src, dst, strerror(errno));
@@ -216,6 +218,7 @@ int force_mount(const char *src, const char *dst, const char *mtype, unsigned lo
 		}
 	}
 out:
+	printf("************force_mount*******************\n");
 	return ret;
 }
 

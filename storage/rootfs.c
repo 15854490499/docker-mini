@@ -325,7 +325,6 @@ void free_rootfs_list(struct rootfs_list *all_rootfs) {
 }
 
 static int remove_rootfs_from_memory(char *id) {
-	printf("=============remove_rootfs_from_memory================\n");
 	struct rootfs_list_item *item = g_rootfs_store->rootfs_list;
 	
 	while(item->next != NULL) {
@@ -341,7 +340,6 @@ static int remove_rootfs_from_memory(char *id) {
 	free(d->rootfs_id);
 	free(d->layer);
 	free_array_by_len(d->names, d->names_len);
-	printf("*****************remove_rootfs_from_memory*************\n");
 	return 0;
 }
 
@@ -369,7 +367,6 @@ static int remove_rootfs_dir(const char *id)
 }
 
 int delete_rootfs_from_store(const char *id) {
-	printf("=================delete_rootfs_from_store===================\n");
 	int ret = 0;
 	cntrootfs_t *cntr = NULL;
 
@@ -401,7 +398,6 @@ int delete_rootfs_from_store(const char *id) {
 		goto out;
 	}
 out:
-	printf("******************delete_rootfs_from_store*******************\n");
 	return ret;
 }
 
@@ -517,7 +513,6 @@ out:
 
 storage_rootfs *rootfs_store_get_rootfs(const char *id) 
 {
-	printf("================rootfs_store_get_rootfs=================\n");
     cntrootfs_t *cntr = NULL;
     storage_rootfs *dup_rootfs = NULL;
 
@@ -542,7 +537,6 @@ storage_rootfs *rootfs_store_get_rootfs(const char *id)
 out:
     //rootfs_ref_dec(cntr);
     //rootfs_store_unlock();
-	printf("********************rootfs_store_get_rootfs**********************\n");
     return dup_rootfs;
 }
 

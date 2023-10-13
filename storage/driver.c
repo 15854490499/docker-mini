@@ -966,9 +966,9 @@ static int do_create(const char *id, const char *parent, const struct graphdrive
 	goto out;
 
 err_out:
-	/*if(recursive_rmdir(layer_dir, 0)) {
+	if(recursive_rmdir(layer_dir, 0)) {
 		printf("Failed to delete layer path: %s\n", layer_dir);
-	}*/
+	}
 out:
 	free(layer_dir);
 	return ret;
