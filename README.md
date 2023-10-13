@@ -127,6 +127,23 @@ Linux下对于docker容器引擎的简单模拟
 
 	将位于项目目录下configs文件下constants.json文件复制到/etc/docker-mini/configs文件夹下。
 
+* [编译安装http-parser库](https://github.com/nodejs/http-parser)
+
+	```C++
+	make  
+	make parsertrace  
+	make url_parser  
+	make install  
+	```
+
+* [编译安装libarchive库](https://www.libarchive.org)
+
+	```C++
+	mkdir build && cd build  
+	../configure --prefix=/usr CFLAGS='-O2 -v'  
+	make && make install
+	```
+
 * build
 
     ```C++
@@ -168,11 +185,21 @@ Linux下对于docker容器引擎的简单模拟
 	```C++
 	user  root;
 	```
-	3. 启动nginx，在宿主机内连接容器nginx，结果如图。  
-	[nginx.jpg](https://github.com/15854490499/docker-mini/blob/main/nginx.png)
+	3. 启动nginx，在宿主机内连接容器nginx，http:192.168.1.100:80，结果如图。  
+	![nginx.jpg](https://github.com/15854490499/docker-mini/blob/main/nginx.png)
 
 * 删除容器
 
 	```C++
     bin/./docker-mini rm container-id
 	```
+
+
+后续
+------------
+* 添加日志模块。
+
+* 完善cpu、memory quota。
+
+* 增加查询镜像和容器功能。
+ 
