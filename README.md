@@ -57,12 +57,10 @@ Linux下对于docker容器引擎的简单模拟
 	1. 获取容器底层镜像的id。
 	2. 为容器创建overlay文件系统读写层。  
 
-
 	* 检查宿主机文件系统是否支持quota，目前仅支持xfs和ext4文件系统。用户通过设置quota限制底层rootfs大小防止将磁盘占满。
 	* 创建读写层对应diff、work、merged文件夹并注册到/var/lib/docker-mini/overlay-layers文件夹下。
 	* 保存层配置。  
 
-	
 	3. 创建容器配置文件并保存。
 	4. 检查挂载和卸载容器根文件系统是否有问题。
 
@@ -77,7 +75,14 @@ Linux下对于docker容器引擎的简单模拟
 	* [overlay2文件系统](https://docs.docker.com/storage/storagedriver/overlayfs-driver)  
 
 	  以nginx:latest镜像为image layers的容器为例，挂载时使用mount系统调用，source参数为"overlay"，target参数为"/var/lib/docker-mini/overlay/<conatiner-id>/merged"，
-	  filesystemtype参数为"overlay", data参数为"lowerdir=/var/lib/docker-mini/overlay/l/e5b5dd506285cd715d73152012:/var/lib/docker-mini/overlay/l/5a07ef8eaecdd048f1357e2e72:/var/lib/docker-mini/overlay/l/b818003a0c94adbaf467eee4e4:/var/lib/docker-mini/overlay/l/6631e6653cc25a44d009acc08c:/var/lib/docker-mini/overlay/l/f2299249489af33a4fce380361:/var/lib/docker-mini/overlay/l/ab6e6b5bacd8f5060576108e5b:/var/lib/docker-mini/overlay/l/f191ad573e2d31f5169d0f9006,upperdir=/var/lib/docker-mini/overlay/<container-id>/diff,workdir=/var/lib/docker-mini/overlay/<container-id>/work"。
+	  filesystemtype参数为"overlay", data参数为"lowerdir=/var/lib/docker-mini/overlay/l/e5b5dd506285cd715d73152012:  
+	  /var/lib/docker-mini/overlay/l/5a07ef8eaecdd048f1357e2e72:  
+	  /var/lib/docker-mini/overlay/l/b818003a0c94adbaf467eee4e4:  
+	  /var/lib/docker-mini/overlay/l/6631e6653cc25a44d009acc08c:  
+	  /var/lib/docker-mini/overlay/l/f2299249489af33a4fce380361:  
+	  /var/lib/docker-mini/overlay/l/ab6e6b5bacd8f5060576108e5b:  
+	  /var/lib/docker-mini/overlay/l/f191ad573e2d31f5169d0f9006,  
+	  upperdir=/var/lib/docker-mini/overlay/<container-id>/diff,workdir=/var/lib/docker-mini/overlay/<container-id>/work"。
 	
 	* [网络配置](https://blog.csdn.net/qq_36733838/article/details/127592976)
 	  
@@ -93,8 +98,7 @@ Linux下对于docker容器引擎的简单模拟
 	1. CLONE_NEWPID标志位通过置零父子进程间共享pid namespace，使得宿主机操作系统内核为子进程创建新的pid namespace。高级别namespace可以看到低级别namespace的pid，反之不可。
 	2. CLONE_NEWNS标志位置零进程间挂载点共享，为容器提供挂载点隔离，每个mount namespace都拥有一份自己的挂载点列表，低级别映射无法影响到高级别挂载点。
 	3. CLONE_UTS标志位置零进程间UTS共享，为容器隔离hostname、domainname以及操作系统内核版本等，子进程会复制父进程相关信息直至被更改。
-	4. CLONE_NEWNET标志位置零进程间网络资源共享， 如网络设备，协议栈，路由表，防火墙规则，端口等。
-  
+	4. CLONE_NEWNET标志位置零进程间网络资源共享， 如网络设备，协议栈，路由表，防火墙规则，端口等。  
 
 	* cgroups限制cpu、内存资源
 
@@ -185,7 +189,7 @@ Linux下对于docker容器引擎的简单模拟
 	```C++
 	user  root;
 	```
-	3. 启动nginx，在宿主机内连接容器nginx，http:192.168.1.100:80，结果如图。  
+	3. 启动nginx，在宿主机内连接容器nginx，http:192.168.0.100:80，结果如图。  
 	![nginx.jpg](https://github.com/15854490499/docker-mini/blob/main/nginx.png)
 
 * 删除容器
