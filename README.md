@@ -55,11 +55,13 @@ Linux下对于docker容器引擎的简单模拟
 * 创建容器
 	
 	1. 获取容器底层镜像的id。
-	2. 为容器创建overlay文件系统读写层。
+	2. 为容器创建overlay文件系统读写层。  
+
 
 	* 检查宿主机文件系统是否支持quota，目前仅支持xfs和ext4文件系统。用户通过设置quota限制底层rootfs大小防止将磁盘占满。
 	* 创建读写层对应diff、work、merged文件夹并注册到/var/lib/docker-mini/overlay-layers文件夹下。
-	* 保存层配置。
+	* 保存层配置。  
+
 	
 	3. 创建容器配置文件并保存。
 	4. 检查挂载和卸载容器根文件系统是否有问题。
@@ -83,14 +85,16 @@ Linux下对于docker容器引擎的简单模拟
 	2. 创建虚拟网卡veth2及其配对veth1，两者通过netlink通信。
 	   其中veth1连接到网桥，veth2作为网卡放入运行容器内并将其取名为eth0。
 	3. 设置容器网卡ip和子网掩码，启动veth1、veth2，将容器网关地址设为网桥地址。
-	4. 设置容器mac地址。
+	4. 设置容器mac地址。  
 
 	* clone创建namespace  
+
 
 	1. CLONE_NEWPID标志位通过置零父子进程间共享pid namespace，使得宿主机操作系统内核为子进程创建新的pid namespace。高级别namespace可以看到低级别namespace的pid，反之不可。
 	2. CLONE_NEWNS标志位置零进程间挂载点共享，为容器提供挂载点隔离，每个mount namespace都拥有一份自己的挂载点列表，低级别映射无法影响到高级别挂载点。
 	3. CLONE_UTS标志位置零进程间UTS共享，为容器隔离hostname、domainname以及操作系统内核版本等，子进程会复制父进程相关信息直至被更改。
 	4. CLONE_NEWNET标志位置零进程间网络资源共享， 如网络设备，协议栈，路由表，防火墙规则，端口等。
+  
 
 	* cgroups限制cpu、内存资源
 
@@ -106,17 +110,17 @@ Linux下对于docker容器引擎的简单模拟
 
     ```C++
     // 创建网桥
-    brctl addbr docker0
+    brctl addbr docker-mini0
 
     // 分配ip
-    ifconfig docker0 192.168.0.1
+    ifconfig docker-mini0 192.168.0.1
 
     // 打开转发配置
     sysctl net.ipv4.conf.all.forwarding=1
 	iptables -P FORWARD ACCEPT
 
 	//使用NAT
-	iptables -t nat -A POSTROUTING -s 192.168.0.1/16 ! -o br0 -j MASQUERADE
+	iptables -t nat -A POSTROUTING -s 192.168.0.1/16 ! -o docker-mini0 -j MASQUERADE
     ```  
 
 * 创建配置文件
@@ -162,7 +166,7 @@ Linux下对于docker容器引擎的简单模拟
 	```  
 	2. 修改容器内nginx.conf文件，添加
 	```C++
-	user : root;
+	user  root;
 	```
 	3. 启动nginx，在宿主机内连接容器nginx，结果如图。  
 	[nginx.jpg](https://github.com/15854490499/docker-mini/blob/main/nginx.png)

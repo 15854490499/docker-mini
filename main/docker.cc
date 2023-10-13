@@ -103,15 +103,43 @@ void docker::container::start_bash() {
 }
 
 void docker::container::start_container() {
+	int ret = 0;
 	char veth1buf[IFNAMSIZ] = "enp0s3X";
 	char veth2buf[IFNAMSIZ] = "enp0s3X";
+	process_pid child_pid;
+
 	veth1 = lxc_mkifname(veth1buf);
 	veth2 = lxc_mkifname(veth2buf);
-	lxc_veth_create(veth1, veth2);
-	setup_private_host_hw_addr(veth1);
-	lxc_bridge_attach(config.bridge_name.c_str(), veth1);
-	lxc_netdev_up(veth1);
-	auto setup = [](void *args) -> int {
+	if(veth1 == NULL || veth2 == NULL) {
+		printf("can not create ifname\n");
+		return;
+	}
+
+	ret = lxc_veth_create(veth1, veth2);
+	if(ret != 0) {
+		printf("create veth pair err\n");
+		goto out;
+	}
+
+	ret = setup_private_host_hw_addr(veth1);
+	if(ret != 0) {
+		printf("setup private host hardware addr err\n");
+		goto out;
+	}
+	
+	ret = lxc_bridge_attach(config.bridge_name.c_str(), veth1);
+	if(ret != 0) {
+		printf("attach veth1 to bridge err\n");
+		goto out;
+	}
+
+	ret = lxc_netdev_up(veth1);
+	if(ret != 0) {
+		printf("setup veth1 err\n");
+		goto out;
+	}
+
+	setup = [](void *args) -> int {
 		auto _this = reinterpret_cast<container *>(args);
 		_this->basic_setting();
 		_this->set_hostname();
@@ -121,14 +149,27 @@ void docker::container::start_container() {
 		_this->start_bash();
 		return proc_wait;
 	};
-	process_pid child_pid = clone(setup, child_stack, 
-											CLONE_NEWPID|
-											CLONE_NEWNS|
-											CLONE_NEWUTS|
-											CLONE_NEWNET|
-											SIGCHLD, this);
+
+	if((m_sem = sem_open("/docker-mini", O_CREAT | O_RDWR, 0666, 0)) == SEM_FAILED) {
+		printf("sem_open err\n");
+		goto out;
+	}
+
+	child_pid = clone(setup, child_stack, 
+								CLONE_NEWPID|
+								CLONE_NEWNS|
+								CLONE_NEWUTS|
+								CLONE_NEWNET|
+								SIGCHLD, this);
 	lxc_netdev_move_by_name(veth2, child_pid, "eth0");
+	sem_post(m_sem);
 	waitpid(child_pid, nullptr, 0);
+
+out:
+	sem_close(m_sem);
+	free(veth1);
+	free(veth2);
+	return;
 }
 
 void docker::container::set_hostname() {
@@ -146,10 +187,13 @@ void docker::container::set_procsys() {
 }
 
 void docker::container::set_network() {
-	int ifindex = if_nametoindex("eth0");
+	int ifindex = 0;
 	struct in_addr ipv4;
 	struct in_addr bcast;
 	struct in_addr gateway;
+
+	sem_wait(this->m_sem);
+	ifindex = if_nametoindex("eth0");
 	inet_pton(AF_INET, this->config.ip.c_str(), &ipv4);
 	inet_pton(AF_INET, "255.255.255.0", &bcast);
 	inet_pton(AF_INET, this->config.bridge_ip.c_str(), &gateway);
@@ -225,7 +269,7 @@ void docker::container::start(const std::string container_id) {
 	}
 	config.root_dir = mount_point;
 	config.ip = "192.168.0.100";
-	config.bridge_name = "docker0";
+	config.bridge_name = "docker-mini0";
 	config.bridge_ip = "192.168.0.1";
 	this->config = config;
 	this->start_container();

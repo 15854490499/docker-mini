@@ -12,6 +12,8 @@
 #include <net/if.h>
 #include <arpa/inet.h>
 #include <unordered_map>
+#include <semaphore.h>
+
 #include "network.h"
 
 #define STACK_SIZE (512 * 512)
@@ -41,6 +43,8 @@ private:
 	char child_stack[STACK_SIZE];
 	container_config config;
 	char *veth1, *veth2;
+	sem_t *m_sem;
+	int (*setup)(void *);
 	void basic_setting();
 	void start_bash();
 	void start_container();
