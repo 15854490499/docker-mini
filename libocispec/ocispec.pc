@@ -1,0 +1,11 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: libocispec
+Description: A library for easily parsing [OCI runtime](https://github.com/opencontainers/runtime-spec) and [OCI image](https://github.com/opencontainers/image-spec) files.
+Requires: yajl
+Version: 0.3
+Libs: -L${libdir} -locispec
+Cflags: -I${includedir}/ocispec
