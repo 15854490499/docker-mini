@@ -1,4 +1,5 @@
 #include "config.h"
+#include "log.h"
 
 configs_constants *g_configs_constants = NULL;
 
@@ -8,7 +9,7 @@ int init_constants() {
 
 	g_configs_constants = configs_constants_parse_file(CONSTANTS_JSON_CONF_FILE, NULL, &err);
 	if(g_configs_constants == NULL) {
-		printf("Load constants json config failed: %s\n", err);
+		LOG_ERROR("Load constants json config failed: %s\n", err);
 		ret = -1;
 		goto out;
 	}

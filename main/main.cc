@@ -2,6 +2,7 @@
 #include <locale.h>
 
 #include "parse_cmd.h"
+#include "log.h"
 
 static int set_locale() {
 	int ret = 0;
@@ -21,7 +22,6 @@ int main(int argc, char** argv) {
 
 	int ret = 0;
 	struct command_parameter *cmd = NULL;
-	
 	command_parameters_init(&cmd);
 	if(cmd == NULL) {
 		printf("command parameters init err\n");

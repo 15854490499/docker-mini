@@ -7,10 +7,12 @@
 
 #include "timestamp.h"
 #include "utils.h"
+#include "log.h"
+
 bool valid_time_tz(const char *time) {
 	char *pattern = "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(.[0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})$";
 	if(time == NULL)  {
-		printf("invalid NULL param\n");
+		LOG_ERROR("invalid NULL param\n");
 		return false;
 	}
 	return reg_match(pattern, time) == 0;
@@ -187,14 +189,14 @@ bool fix_date(struct tm *tm)
                (is_out_of_range(tm->tm_year, 1900, 2100));
 
     if (ret) {
-        printf("Normal section out of range\n");
+    	LOG_ERROR("Normal section out of range\n");
         return false;
     }
 
     int valid_day = get_valid_days(tm->tm_mon, tm->tm_year);
     ret = ret || is_out_of_range(tm->tm_mday, 1, valid_day);
     if (ret) {
-        printf("Day out of range\n");
+    	LOG_ERROR("Day out of range\n");
         return false;
     }
     tm->tm_year -= 1900;
@@ -225,7 +227,7 @@ bool get_tm_from_str(const char *str, struct tm *tm, int32_t *nanos)
                 format = rFC339Local;
                 break;
             default:
-                printf("date format error\n");
+            	LOG_ERROR("date format error\n");
                 return false;
         }
     } else {
@@ -233,12 +235,12 @@ bool get_tm_from_str(const char *str, struct tm *tm, int32_t *nanos)
     }
 
     if (!parsing_time(format, str, tm, nanos)) {
-        printf("Failed to parse time \"%s\" with format \"%s\"\n", str, format);
+    	LOG_ERROR("Failed to parse time \"%s\" with format \"%s\"\n", str, format);
         return false;
     }
 
     if (!fix_date(tm)) {
-        printf("\"%s\" is invalid\n", str);
+    	LOG_ERROR("\"%s\" is invalid\n", str);
         return false;
     }
 
@@ -267,7 +269,7 @@ static int time_tz_to_seconds_nanos(const char *time_tz, int64_t *seconds, int32
     time_str[strlen(time_str) - 1] = '\0'; /* strip last 'Z' */
 
     if (!get_tm_from_str(time_str, &t, &nano)) {
-        printf("get tm from string %s failed\n", time_str);
+    	LOG_ERROR("get tm from string %s failed\n", time_str);
         nret = -1;
         goto err_out;
     }    
@@ -352,26 +354,26 @@ static bool get_tm_zone_from_str(const char *str, struct tm *tm, int32_t *nanos,
     bool ret = false;
 
     if (hasnil(str, tm, nanos, tz)) {
-       	printf("Get tm and timezone from str input error\n");
+       	LOG_ERROR("Get tm and timezone from str input error\n");
         return false;
     }
 
     tmstr = strdup_s(str);
     zp = tm_get_zp(tmstr);
     if (zp == NULL) {
-        printf("No time zone symbol found in input string\n");
+    	LOG_ERROR("No time zone symbol found in input string\n");
         goto err_out;
     }
     zonestr = strdup_s(zp);
     *zp = '\0';
 
     if (!get_tm_from_str(tmstr, tm, nanos)) {
-        printf("Get tm from str failed\n");
+    	LOG_ERROR("Get tm from str failed\n");
         goto err_out;
     }
 
     if (!tz_init_ok(tz, zonestr)) {
-        printf("init tz failed\n");
+    	LOG_ERROR("init tz failed\n");
         goto err_out;
     }
     ret = true;
@@ -401,14 +403,14 @@ int str_to_nanos(const char *str, int64_t *nanos)
     }
 
     if (!valid_time_tz(str)) {
-        printf("invalid time %s\n", str);
+    	LOG_ERROR("invalid time %s\n", str);
         return -1;
     }
 
     if (str[strlen(str) - 1] == 'Z') {
         int ret = time_tz_to_seconds_nanos(str, &ts.seconds, &ts.nanos);
         if (ret != 0) {
-            printf("Invalid time stamp: %s\n", str);
+        	LOG_ERROR("Invalid time stamp: %s\n", str);
             return -1;
         }
         *nanos = ts.seconds * Time_Second + ts.nanos;
@@ -416,7 +418,7 @@ int str_to_nanos(const char *str, int64_t *nanos)
     }
 
     if (!get_tm_zone_from_str(str, &tm, &nano, &tz)) {
-        printf("Transform str to timestamp failed\n");
+    	LOG_ERROR("Transform str to timestamp failed\n");
         return -1;
     }
 
@@ -430,7 +432,7 @@ types_timestamp_t str_to_timestamp(const char *str)
     types_timestamp_t timestamp = { 0 };
 
     if (str_to_nanos(str, &nanos) != 0) {
-        printf("Failed to get created time from image config\n");
+    	LOG_ERROR("Failed to get created time from image config\n");
         goto out;
     }
 
@@ -500,7 +502,7 @@ bool get_time_buffer(const types_timestamp_t *timestamp, char *timebuffer, size_
 
 out:
     if (nret < 0 || (size_t)nret >= tmp_size) {
-        printf("sprintf timebuffer failed\n");
+    	LOG_ERROR("sprintf timebuffer failed\n");
         return false;
     }
 
@@ -513,13 +515,13 @@ bool get_now_time_stamp(types_timestamp_t *timestamp)
     struct timespec ts;
 
     if (timestamp == NULL) {
-        printf("Invalid arguments\n");
+    	LOG_ERROR("Invalid arguments\n");
         return false;
     }    
 
     err = clock_gettime(CLOCK_REALTIME, &ts);
     if (err != 0) { 
-        printf("failed to get time\n");
+    	LOG_ERROR("failed to get time\n");
         return false;
     }    
     timestamp->has_seconds = true;

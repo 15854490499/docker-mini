@@ -1,4 +1,4 @@
-CXXFLAGS = -I$(ROOT)/libocispec -I$(ROOT)/utils -I$(ROOT)/net -I$(ROOT)/capi
+CXXFLAGS = -I$(ROOT)/libocispec -I$(ROOT)/utils -I$(ROOT)/net -I$(ROOT)/capi -I$(ROOT)/log
 all: $(OBJ_DIR)/docker.o $(OBJ_DIR)/main.o $(OBJ_DIR)/parse_cmd.o
 
 $(OBJ_DIR)/docker.o: docker.cc

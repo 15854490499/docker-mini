@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 #include "rootfs.h"
-
+#include "log.h"
 #include "utils.h"
 #include "fs.h"
 
@@ -36,7 +36,7 @@ static int append_container_rootfs(const char *id, const char *layer, const char
 
 	item = calloc_s(sizeof(struct rootfs_list_item), 1);
 	if(item == NULL) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		return -1;
 	}
 
@@ -69,20 +69,20 @@ static int copy_id_map(storage_rootfs *c, const struct storage_rootfs_options *r
 
     if (rootfs_opts->id_mapping_opts.uid_map_len != 0) { 
         if (rootfs_opts->id_mapping_opts.uid_map_len >= SIZE_MAX / sizeof(storage_rootfs_uidmap_element *)) {
-           	printf("Too many id map\n");
+           	LOG_ERROR("Too many id map\n");
             return -1;
         }
         uid_map = (storage_rootfs_uidmap_element **)common_calloc_s(sizeof(storage_rootfs_uidmap_element *) * 
                                                                          rootfs_opts->id_mapping_opts.uid_map_len);
         if (uid_map == NULL) {
-            printf("Out of memory\n");
+        	LOG_ERROR("Out of memory\n");
             return -1;
         }
 
         for (i = 0; i < rootfs_opts->id_mapping_opts.uid_map_len; i++) {
             uid_map[i] = (storage_rootfs_uidmap_element *)common_calloc_s(sizeof(storage_rootfs_uidmap_element));
             if (uid_map[i] == NULL) {
-                printf("Out of memory\n");
+            	LOG_ERROR("Out of memory\n");
                 ret = -1;
                 goto out; 
             }
@@ -95,20 +95,20 @@ static int copy_id_map(storage_rootfs *c, const struct storage_rootfs_options *r
 
     if (rootfs_opts->id_mapping_opts.gid_map_len != 0) { 
         if (rootfs_opts->id_mapping_opts.gid_map_len >= SIZE_MAX / sizeof(storage_rootfs_gidmap_element *)) {
-            printf("Too many id map\n");
+        	LOG_ERROR("Too many id map\n");
             return -1;
         }
         gid_map = (storage_rootfs_gidmap_element **)common_calloc_s(sizeof(storage_rootfs_gidmap_element *) * 
                                                                          rootfs_opts->id_mapping_opts.gid_map_len);
         if (gid_map == NULL) {
-           	printf("Out of memory\n");
+           	LOG_ERROR("Out of memory\n");
             return -1;
         }
 
         for (i = 0; i < rootfs_opts->id_mapping_opts.gid_map_len; i++) {
             gid_map[i] = (storage_rootfs_gidmap_element *)common_calloc_s(sizeof(storage_rootfs_gidmap_element));
             if (gid_map[i] == NULL) {
-                printf("Out of memory\n");
+            	LOG_ERROR("Out of memory\n");
                 ret = -1;
                 goto out;
             }
@@ -155,7 +155,7 @@ static storage_rootfs *new_storage_rootfs(const char *id, const char *image, con
 
     c = (storage_rootfs *)common_calloc_s(sizeof(storage_rootfs));
     if (c == NULL) {
-        printf("Out of memory\n");
+    	LOG_ERROR("Out of memory\n");
         return NULL;
     }    
 
@@ -169,14 +169,14 @@ static storage_rootfs *new_storage_rootfs(const char *id, const char *image, con
     c->metadata = strdup_s(metadata);
 
     if (!get_now_time_buffer(timebuffer, sizeof(timebuffer))) {
-        printf("Failed to get now time string");
+    	LOG_ERROR("Failed to get now time string");
         ret = -1;
         goto out; 
     }    
     c->created = strdup_s(timebuffer);
 
     if (copy_id_map(c, rootfs_opts) != 0) { 
-        printf("Failed to copy UID&GID map");
+    	LOG_ERROR("Failed to copy UID&GID map");
         ret = -1;
         goto out; 
     }    
@@ -204,7 +204,7 @@ static cntrootfs_t *create_empty_cntr()
 
     result = (cntrootfs_t *)calloc_s(sizeof(cntrootfs_t), 1); 
     if (result == NULL) {
-        printf("Out of memory\n");
+    	LOG_ERROR("Out of memory\n");
         goto err_out;
     }   
     result->refcnt = 1;
@@ -221,7 +221,7 @@ cntrootfs_t *new_rootfs(storage_rootfs *scntr)
     cntrootfs_t *c = NULL;
 
     if (scntr == NULL) {
-        printf("Empty storage cntr\n");
+    	LOG_ERROR("Empty storage cntr\n");
         return NULL;
     }   
 
@@ -249,26 +249,26 @@ static int save_rootfs(cntrootfs_t *cntr)
     char *json_data = NULL;
 
     if (get_container_path(cntr->srootfs->id, container_path, sizeof(container_path)) != 0) { 
-     	printf("Failed to get container path by id: %s", cntr->srootfs->id);
+     	LOG_ERROR("Failed to get container path by id: %s", cntr->srootfs->id);
         return -1;
     }    
 
     strcpy(container_dir, container_path);
     ret = mkdir_p(dirname(container_dir), 0666);
     if (ret < 0) { 
-        printf("Failed to create container directory %s.\n", container_path);
+    	LOG_ERROR("Failed to create container directory %s.\n", container_path);
         return -1;
     }    
 
     json_data = storage_rootfs_generate_json(cntr->srootfs, NULL, &err);
     if (json_data == NULL) {
-        printf("Failed to generate container json path string:%s\n", err ? err : " ");
+    	LOG_ERROR("Failed to generate container json path string:%s\n", err ? err : " ");
         ret = -1;
         goto out; 
     }    
 
     if (atomic_write_file(container_path, json_data, strlen(json_data), 0666, false) != 0) { 
-        printf("Failed to save container json file\n");
+    	LOG_ERROR("Failed to save container json file\n");
         ret = -1;
         goto out; 
     }    
@@ -354,12 +354,12 @@ static int remove_rootfs_dir(const char *id)
     char rootfs_path[PATH_MAX] = { 0x00 };
 
     if (get_data_dir(id, rootfs_path, sizeof(rootfs_path)) != 0) { 
-        printf("Failed to get rootfs data dir: %s\n", id); 
+    	LOG_ERROR("Failed to get rootfs data dir: %s\n", id); 
         return -1;
     }    
 
     if (recursive_rmdir(rootfs_path, 0) != 0) { 
-        printf("Failed to delete rootfs directory : %s\n", rootfs_path);
+    	LOG_ERROR("Failed to delete rootfs directory : %s\n", rootfs_path);
         return -1;
     }    
 
@@ -371,29 +371,29 @@ int delete_rootfs_from_store(const char *id) {
 	cntrootfs_t *cntr = NULL;
 
 	if(id == NULL) {
-		printf("Invalid input parameter : empty id\n");
+		LOG_ERROR("Invalid input parameter : empty id\n");
 		return -1;
 	}
 
 	if(g_rootfs_store == NULL) {
-		printf("Rootfs store is not ready\n");
+		LOG_ERROR("Rootfs store is not ready\n");
 		return -1;
 	}
 
 	cntr = lookup(id);
 	if(cntr == NULL) {
-		printf("Rootfs %s not known\n", id);
+		LOG_ERROR("Rootfs %s not known\n", id);
 		return -1;
 	}
 
 	if(remove_rootfs_from_memory(cntr->srootfs->id) != 0) {
-		printf("Failed to remove rootfs from memory\n");
+		LOG_ERROR("Failed to remove rootfs from memory\n");
 		ret = -1;
 		goto out;
 	}
 
 	if(remove_rootfs_dir(cntr->srootfs->id) != 0) {
-		printf("Failed to delete rootfs directory\n");
+		LOG_ERROR("Failed to delete rootfs directory\n");
 		ret = -1;
 		goto out;
 	}
@@ -412,7 +412,7 @@ char *rootfs_store_create(const char *id, const char **names, size_t names_len, 
     storage_rootfs *c = NULL;
 
     /*if (g_rootfs_store == NULL) {
-        printf("Container store is not ready\n");
+    	LOG_ERROR("Container store is not ready\n");
         return NULL;
     }*/
 
@@ -423,7 +423,7 @@ char *rootfs_store_create(const char *id, const char **names, size_t names_len, 
     }
 
     if (dst_id == NULL) {
-        printf("Out of memory or generate random container id failed\n");
+    	LOG_ERROR("Out of memory or generate random container id failed\n");
         ret = -1;
         goto out;
     }
@@ -442,29 +442,29 @@ char *rootfs_store_create(const char *id, const char **names, size_t names_len, 
 
     c = new_storage_rootfs(dst_id, image, names, names_len, layer, metadata, rootfs_opts);
     if (c == NULL) {
-        printf("Failed to generate new storage container\n");
+    	LOG_ERROR("Failed to generate new storage container\n");
         ret = -1;
         goto out;
     }
 
     cntr = new_rootfs(c);
     if (cntr == NULL) {
-        printf("Out of memory\n");
+    	LOG_ERROR("Out of memory\n");
         ret = -1;
         goto out;
     }
     c = NULL;
 
     if (append_container_rootfs(dst_id, layer, (const char **)names, names_len, cntr) != 0) {
-        printf("Failed to append container to container store");
+    	LOG_ERROR("Failed to append container to container store");
         ret = -1;
         goto out;
     }
 
     if (save_rootfs(cntr) != 0) {
-        printf("Failed to save container\n");
+    	LOG_ERROR("Failed to save container\n");
         if (delete_rootfs_from_store(dst_id) != 0) {
-            printf("Failed to delete rootfs from store\n");
+        	LOG_ERROR("Failed to delete rootfs from store\n");
         }
         c = NULL;
         cntr = NULL;
@@ -496,12 +496,12 @@ static storage_rootfs *copy_rootfs(const storage_rootfs *rootfs)
 
     json = storage_rootfs_generate_json(rootfs, NULL, &err);
     if (json == NULL) {
-        printf("Failed to generate json: %s\n", err);
+    	LOG_ERROR("Failed to generate json: %s\n", err);
         goto out;
     }
     ans = storage_rootfs_parse_data(json, NULL, &err);
     if (ans == NULL) {
-        printf("Failed to parse json: %s\n", err);
+    	LOG_ERROR("Failed to parse json: %s\n", err);
         goto out;
     }
 
@@ -517,18 +517,18 @@ storage_rootfs *rootfs_store_get_rootfs(const char *id)
     storage_rootfs *dup_rootfs = NULL;
 
     if (id == NULL) {
-        printf("Invalid parameter, id is NULL\n");
+    	LOG_ERROR("Invalid parameter, id is NULL\n");
         return NULL;
     }    
 
     if (g_rootfs_store == NULL) {
-        printf("Rootfs store is not ready\n");
+    	LOG_ERROR("Rootfs store is not ready\n");
         return NULL;
     }    
 
     cntr = lookup(id);
     if (cntr == NULL) {
-        printf("Rootfs not known\n");
+    	LOG_ERROR("Rootfs not known\n");
         goto out; 
     }    
 
@@ -548,7 +548,7 @@ char *rootfs_store_get_id(const char *name) {
 	}
 
 	if(rootfs->id == NULL) {
-		printf("Invalid rootfs %s id = NULL\n", name);
+		LOG_ERROR("Invalid rootfs %s id = NULL\n", name);
 	}
 	return strdup_s(rootfs->id);
 }
@@ -558,12 +558,12 @@ static int do_append_container(storage_rootfs *c) {
 	
 	cntr = new_rootfs(c);
 	if(cntr == NULL) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		return -1;
 	}
 
 	if (append_container_rootfs(c->id, c->layer, (const char**)(c->names), c->names_len, cntr) != 0) {
-        printf("Failed to append container to container store\n");
+    	LOG_ERROR("Failed to append container to container store\n");
     	return -1;
 	}
 
@@ -581,20 +581,20 @@ static int append_container_by_directory(const char *container_dir)
     nret = snprintf(container_path, sizeof(container_path), "%s/%s", container_dir, CONTAINER_JSON);
     if (nret < 0 || (size_t)nret >= sizeof(container_path)) {
         // snprintf error, not append, but outside should not delete the rootfs
-        printf("Failed to get container path\n");
+    	LOG_ERROR("Failed to get container path\n");
         return -1;
     }    
 
     c = storage_rootfs_parse_file(container_path, NULL, &err);
     if (c == NULL) {
-        printf("Failed to parse container path: %s\n", err);
+    	LOG_ERROR("Failed to parse container path: %s\n", err);
         ret = -1;
         goto out; 
     }    
 
     if (do_append_container(c) != 0) { 
         // append error should not return -1, outside should not remove rootfs
-        printf("Failed to append container\n");
+    	LOG_ERROR("Failed to append container\n");
         ret = -1;
         goto out; 
     }    
@@ -618,22 +618,22 @@ static int rootfs_store_load() {
 
 	ret = list_all_subdir(g_rootfs_store->dir, &container_dirs, &container_dirs_num);
 	if(ret != 0) {
-		printf("Failed to get container directories\n");
+		LOG_ERROR("Failed to get container directories\n");
 		goto out;
 	}
 
 	for(i = 0; i < container_dirs_num; i++) {
-		printf("Restore the containers:%s\n", container_dirs[0]);
+		LOG_INFO("Restore the containers:%s\n", container_dirs[0]);
 		nret = snprintf(container_path, sizeof(container_path), "%s/%s", g_rootfs_store->dir, container_dirs[i]);
 		if(nret < 0 || (size_t)nret >= sizeof(container_path)) {
-			printf("Failed to get container path\n");
+			LOG_ERROR("Failed to get container path\n");
 			continue;
 		}
 		append_ret = append_container_by_directory(container_path);
 		if(append_ret != 0) {
-			printf("Found container path but load failed: %s, deleting...\n", container_path);
+			LOG_INFO("Found container path but load failed: %s, deleting...\n", container_path);
 			if(recursive_rmdir(container_path, 0) != 0) {
-				printf("Failed to delete rootfs directory : %s\n", container_path);
+				LOG_ERROR("Failed to delete rootfs directory : %s\n", container_path);
 			}
 			continue;
 		}
@@ -677,14 +677,14 @@ int rootfs_store_init() {
 
 	ret = mkdir_p(g_rootfs_store->dir, 0666);
 	if(ret < 0) {
-		printf("Unable to create container store directory %s.\n", g_rootfs_store->dir);
+		LOG_ERROR("Unable to create container store directory %s.\n", g_rootfs_store->dir);
 		ret = -1;
 		goto out;
 	}
 	
 	ret = rootfs_store_load();
 	if(ret != 0) {
-		printf("Failed to load container store\n");
+		LOG_ERROR("Failed to load container store\n");
 		ret = -1;
 		goto out;
 	}

@@ -21,6 +21,8 @@
 #include <strings.h>
 #include <zlib.h>
 
+#include "log.h"
+
 struct unit_map_def {
 	int64_t mltpl;
 	char *name;
@@ -86,7 +88,7 @@ static int do_clean_path(const char *respath, const char *limit_respath, const c
         }
 
         if (dest + (endpos - stpos) >= limit_respath) {
-            printf("Path is too long\n");
+        	LOG_ERROR("Path is too long\n");
             if (dest > respath + 1) {
                 dest--;
             }
@@ -120,17 +122,17 @@ char *clean_path(const char *path, char *realpath, size_t realpath_len)
 
     if (!IS_ABSOLUTE_FILE_NAME(path)) {
         if (!getcwd(respath, PATH_MAX)) {
-            printf("Failed to getcwd\n");
+        	LOG_ERROR("Failed to getcwd\n");
             respath[0] = '\0';
             goto error;
         }
         dest = strchr(respath, '\0');
         if (dest == NULL) {
-            printf("Failed to get the end of respath\n");
+        	LOG_ERROR("Failed to get the end of respath\n");
             goto error;
         }
         if (strlen(path) >= (PATH_MAX - 1) - strlen(respath)) {
-            printf("%s path too long\n", path);
+        	LOG_ERROR("%s path too long\n", path);
             goto error;
         }
         (void)strcat(respath, path);
@@ -164,18 +166,18 @@ char *path_join(const char *dir, const char *file)
     char cleaned[PATH_MAX] = { 0 }; 
 
     if (dir == NULL || file == NULL) {
-        printf("NULL dir or file, failed\n");
+    	LOG_ERROR("NULL dir or file, failed\n");
         return NULL;
     }    
 
     nret = snprintf(path, PATH_MAX, "%s/%s", dir, file);
     if (nret < 0 || nret >= PATH_MAX) {
-        printf("dir or file too long, failed\n");
+    	LOG_ERROR("dir or file too long, failed\n");
         return NULL;
     }    
 
     /*if (util_clean_path(path, cleaned, sizeof(cleaned)) == NULL) {
-        printf("Failed to clean path: %s", path);
+    	LOG_ERROR("Failed to clean path: %s", path);
         return NULL;
     } */   
 
@@ -206,7 +208,7 @@ char *path_dir(const char *path) {
 	int i = 0;
 	
 	if(path == NULL) {
-		printf("invalid NULL param\n");
+		LOG_ERROR("invalid NULL param\n");
 		return NULL;
 	}
 	
@@ -238,7 +240,7 @@ char *path_base(const char *path)
     int i = 0; 
 
     if (path == NULL) {
-        printf("invalid NULL param\n");
+    	LOG_ERROR("invalid NULL param\n");
         return NULL;
     }    
 
@@ -429,21 +431,21 @@ int generate_random_str(char *id, size_t len) {
 	len = len / 2;
 	fd = open("/dev/urandom", O_RDONLY);
 	if(fd == -1) {
-		printf("Failed to open /dev/urandom\n");
+		LOG_ERROR("Failed to open /dev/urandom\n");
 		return -1;
 	}
 
 	for(i = 0; i < len; i++) {
 		int nret;
 		if(read_nointr(fd, &num, sizeof(int)) < 0) {
-			printf("Failed to read urandom value\n");
+			LOG_ERROR("Failed to read urandom value\n");
 			close(fd);
 			return -1;
 		}
 		unsigned char rs = (unsigned char)(num % m);
 		nret = snprintf((id + i * 2), ((len - i) * 2 + 1), "%02x", (unsigned int)rs);
 		if(nret < 0 || (size_t)nret >= ((len - i) * 2 + 1)) {
-			printf("Failed to snprintf random string\n");
+			LOG_ERROR("Failed to snprintf random string\n");
 			close(fd);
 			return -1;
 		}
@@ -543,7 +545,7 @@ char *string_append(const char *post, const char *pre)
         return strdup_s(pre);
     }   
     if (strlen(post) > ((SIZE_MAX - strlen(pre)) - 1)) {
-        printf("String is too long to be appended\n");
+    	LOG_ERROR("String is too long to be appended\n");
         return NULL;
     }   
     length = strlen(post) + strlen(pre) + 1;
@@ -708,35 +710,35 @@ char* read_text_file(const char* path) {
 	FILE* filp = NULL;
 	const long max_size = 10 * 1024 * 1024;
 	if(path == NULL) {
-		printf("invalid NULL param\n");
+		LOG_ERROR("invalid NULL param\n");
 		return NULL;
 	}
 	filp = fopen(path, "r");
 	if(filp == NULL) {
-		printf("open file %s failed\n", path);
+		LOG_ERROR("open file %s failed\n", path);
 		goto err_out;
 	}
 	if(fseek(filp, 0, SEEK_END)) {
-		printf("Seek end failed\n");
+		LOG_ERROR("Seek end failed\n");
 		goto err_out;
 	}
 	len = ftell(filp);
 	if(len > max_size) {
-		printf("File too large\n");
+		LOG_ERROR("File too large\n");
 		goto err_out;
 	}
 	if(fseek(filp, 0, SEEK_SET)) {
-		printf("Seek set failed\n");
+		LOG_ERROR("Seek set failed\n");
 		goto err_out;
 	}
 	buf = (char*)calloc(1, (len + 1));
 	if(buf == NULL) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		goto err_out;
 	}
 	readlen = fread(buf, 1, (size_t)len, filp);
 	if(((readlen < (size_t)len) && (!feof(filp))) || (readlen > (size_t)len)) {
-		printf("failed to read file %s, error: %s\n", path, strerror(errno));
+		LOG_ERROR("failed to read file %s, error: %s\n", path, strerror(errno));
 		free(buf);
 		goto err_out;
 	}
@@ -758,7 +760,7 @@ int write_file(const char* fname, const char* content, size_t content_len, mode_
 		return 0;
 	dst_fd = open(fname, O_WRONLY | O_CREAT | O_TRUNC, mode);
 	if(dst_fd < 0) {
-		printf("create file: %s, failed: %s\n", fname, strerror(errno));
+		LOG_ERROR("create file: %s, failed: %s\n", fname, strerror(errno));
 		ret = -1;
 		goto free_out;
 	}
@@ -771,7 +773,7 @@ int write_file(const char* fname, const char* content, size_t content_len, mode_
 	}
 	if(len < 0 || len != content_len) {
 		ret = -1;
-		printf("write file failed: %s\n", strerror(errno));
+		LOG_ERROR("write file failed: %s\n", strerror(errno));
 		goto free_out;
 	}
 free_out:
@@ -833,24 +835,24 @@ static char *get_random_tmp_file(const char *fname)
 
     base = path_base(fname);
     if (base == NULL) {
-        printf("Failed to get base of %s\n", fname);
+    	LOG_ERROR("Failed to get base of %s\n", fname);
         goto out;
     }
 
     dir = path_dir(fname);
     if (dir == NULL) {
-        printf("Failed to get dir of %s\n", fname);
+    	LOG_ERROR("Failed to get dir of %s\n", fname);
         goto out;
     }
 
     if (generate_random_str(random_tmp, (size_t)RANDOM_TMP_PATH)) {
-        printf("Failed to generate random str for random path\n");
+    	LOG_ERROR("Failed to generate random str for random path\n");
         goto out;
     }
 
     nret = snprintf(rpath, PATH_MAX, ".tmp-%s-%s", base, random_tmp);
     if (nret < 0 || nret >= PATH_MAX) {
-        printf("Failed to generate tmp base file\n");
+    	LOG_ERROR("Failed to generate tmp base file\n");
         goto out;
     }
 
@@ -870,7 +872,7 @@ static int do_atomic_write_file(const char *fname, const char *content, size_t c
 
     dst_fd = open(fname, O_WRONLY | O_CREAT | O_TRUNC, mode);
     if (dst_fd < 0) {
-        printf("Creat file: %s, failed: %s\n", fname, strerror(errno));
+    	LOG_ERROR("Creat file: %s, failed: %s\n", fname, strerror(errno));
         ret = -1;
         goto free_out;
     }
@@ -878,7 +880,7 @@ static int do_atomic_write_file(const char *fname, const char *content, size_t c
     len = write_nointr(dst_fd, content, content_len);
     if (len < 0 || ((size_t)len) != content_len) {
         ret = -1;
-        printf("Write file failed: %s\n", strerror(errno));
+    	LOG_ERROR("Write file failed: %s\n", strerror(errno));
         goto free_out;
     }
 
@@ -914,27 +916,27 @@ int atomic_write_file(const char *fname, const char *content, size_t content_len
 
     tmp_file = get_random_tmp_file(fname);
     if (tmp_file == NULL) {
-        printf("Failed to get tmp file for %s\n", fname);
+    	LOG_ERROR("Failed to get tmp file for %s\n", fname);
         return -1;
     }    
 
     ret = do_atomic_write_file(tmp_file, content, content_len, mode, sync);
     if (ret != 0) { 
-        printf("Failed to write content to tmp file for %s\n", tmp_file);
+    	LOG_ERROR("Failed to write content to tmp file for %s\n", tmp_file);
         ret = -1;
         goto free_out;
     }    
 
     ret = rename(tmp_file, rpath);
     if (ret != 0) { 
-        printf("Failed to rename old file %s to target %s\n", tmp_file, rpath);
+    	LOG_ERROR("Failed to rename old file %s to target %s\n", tmp_file, rpath);
         ret = -1;
         goto free_out;
     }    
 
 free_out:
     if (ret != 0 && unlink(tmp_file) != 0 && errno != ENOENT) {
-        printf("Failed to remove temp file:%s\n", tmp_file);
+    	LOG_ERROR("Failed to remove temp file:%s\n", tmp_file);
     }    
     free(tmp_file);
     return ret; 
@@ -949,7 +951,7 @@ int array_append(char*** array, const char* element) {
 	len = array_len((const char**)(*array));
 	new_array = calloc_s(sizeof(char*), (len + 2));
 	if(new_array == NULL) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		return -1;
 	}
 	if(*array != NULL) {
@@ -1013,7 +1015,7 @@ int scan_subdirs(const char *directory, subdir_callback_t cb, void *context) {
 
 	dir = opendir(directory);
 	if(dir == NULL) {
-		printf("Failed to open directory: %s error:%s\n", directory, strerror(errno));
+		LOG_ERROR("Failed to open directory: %s error:%s\n", directory, strerror(errno));
 		return -1;
 	}
 
@@ -1024,7 +1026,7 @@ int scan_subdirs(const char *directory, subdir_callback_t cb, void *context) {
 		}
 
 		if(!cb(directory, direntp, context)) {
-			printf("Dealwith subdir : %s failed\n", direntp->d_name);
+			LOG_ERROR("Dealwith subdir : %s failed\n", direntp->d_name);
 			ret = -1;
 			break;
 		}
@@ -1063,7 +1065,7 @@ int mkdir_p(const char* dir, mode_t mode) {
 		if(*cur_dir) {
 			ret = mkdir(cur_dir, mode);
 			if(ret != 0 && (errno != EEXIST || !dir_exists(cur_dir))) {
-				printf("mkdir err!\n");
+				LOG_ERROR("mkdir err!\n");
 				goto err_out;
 			}
 		}
@@ -1160,7 +1162,7 @@ int buffer_grow(Buffer *buffer, size_t min_size)
 
     tmp = common_calloc_s(new_size);
     if (tmp == NULL) {
-        printf("Out of memory");
+    	LOG_ERROR("Out of memory");
         return -1;
     }
 
@@ -1226,7 +1228,7 @@ int dup_array_of_strings(const char** src, size_t src_len, char*** dst, size_t* 
 	*dst_len = 0;
 	*dst = (char**)calloc_s(sizeof(char*), src_len);
 	if(*dst == NULL) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		return -1;
 	}
 	for(i = 0; i < src_len; i++) {
@@ -1245,7 +1247,7 @@ int mem_realloc(void** newptr, size_t newsize, void* oldptr, size_t oldsize) {
 
 	tmp = calloc_s(1, newsize);
 	if(tmp == NULL) {
-		printf("Failed to malloc memory\n");
+		LOG_ERROR("Failed to malloc memory\n");
 		return -1;
 	}
 
@@ -1266,14 +1268,14 @@ int reg_match(const char *patten, const char *str)
     regex_t reg;
 
     if (patten == NULL || str == NULL) {
-        printf("invalid NULL param");
+    	LOG_ERROR("invalid NULL param");
         return -1; 
     }   
 
     nret = regcomp(&reg, patten, REG_EXTENDED | REG_NOSUB);
     if (nret != 0) {
         regerror(nret, &reg, buffer, EVENT_ARGS_MAX);
-        printf("regcomp %s failed: %s", patten, buffer);
+    	LOG_ERROR("regcomp %s failed: %s", patten, buffer);
         return -1; 
     }   
 
@@ -1286,7 +1288,7 @@ int reg_match(const char *patten, const char *str)
         goto free_out;
     } else {
         nret = -1; 
-        printf("reg match failed");
+    	LOG_ERROR("reg match failed");
         goto free_out;
     }   
 
@@ -1342,7 +1344,7 @@ int strings_count(const char *str, unsigned char c)
 static bool check_dir_valid(const char *dirpath, int recursive_depth, int *failure)
 {
     if ((recursive_depth + 1) > 31998) {
-        printf("Reach max path depth: %s\n", dirpath);
+    	LOG_ERROR("Reach max path depth: %s\n", dirpath);
         *failure = 1;
         return false;
     }
@@ -1362,12 +1364,12 @@ static int mark_file_mutable(const char *fname)
 
     fd = open(fname, O_RDONLY | O_CLOEXEC | O_NONBLOCK);
     if (fd < 0) { 
-        printf("Failed to open file to modify flags:%s\n", fname);
+    	LOG_ERROR("Failed to open file to modify flags:%s\n", fname);
         return -1;
     }    
 
     if (ioctl(fd, FS_IOC_GETFLAGS, &attributes) < 0) { 
-        printf("Failed to retrieve file flags\n");
+    	LOG_ERROR("Failed to retrieve file flags\n");
         ret = -1;
         goto out; 
     }    
@@ -1375,7 +1377,7 @@ static int mark_file_mutable(const char *fname)
     attributes &= ~FS_IMMUTABLE_FL;
 
     if (ioctl(fd, FS_IOC_SETFLAGS, &attributes) < 0) { 
-        printf("Failed to set file flags\n");
+    	LOG_ERROR("Failed to set file flags\n");
         ret = -1;
         goto out; 
     }    
@@ -1397,11 +1399,11 @@ static bool force_remove_file(const char *fname, int *saved_errno) {
 	}
 
 	if(mark_file_mutable(fname) != 0) {
-		printf("Failed to mark file mutable\n");
+		LOG_ERROR("Failed to mark file mutable\n");
 	}
 
 	if(unlink(fname) != 0) {
-		printf("Failed to delete %s : %s\n", fname, strerror(errno));
+		LOG_ERROR("Failed to delete %s : %s\n", fname, strerror(errno));
 		return false;
 	}
 
@@ -1432,7 +1434,7 @@ static int recursive_rmdir_helper(const char *dirpath, int recursive_depth, int 
 
     directory = opendir(dirpath);
     if (directory == NULL) {
-        printf("Failed to open %s\n", dirpath);
+    	LOG_ERROR("Failed to open %s\n", dirpath);
         return 1;
     }
     pdirent = readdir(directory);
@@ -1448,14 +1450,14 @@ static int recursive_rmdir_helper(const char *dirpath, int recursive_depth, int 
 
         pathname_len = snprintf(fname, PATH_MAX, "%s/%s", dirpath, pdirent->d_name);
         if (pathname_len < 0 || pathname_len >= PATH_MAX) {
-            printf("Pathname too long\n");
+        	LOG_ERROR("Pathname too long\n");
             failure = 1;
             continue;
         }
 
         nret = lstat(fname, &fstat);
         if (nret) {
-            printf("Failed to stat %s\n", fname);
+        	LOG_ERROR("Failed to stat %s\n", fname);
             failure = 1;
             continue;
         }
@@ -1467,13 +1469,13 @@ static int recursive_rmdir_helper(const char *dirpath, int recursive_depth, int 
         if (*saved_errno == 0) {
             *saved_errno = errno;
         }
-        printf("Failed to delete %s\n", dirpath);
+    	LOG_ERROR("Failed to delete %s\n", dirpath);
         failure = 1;
     }
 
     nret = closedir(directory);
     if (nret) {
-        printf("Failed to close directory %s\n", dirpath);
+    	LOG_ERROR("Failed to close directory %s\n", dirpath);
         failure = 1;
     }
 
@@ -1495,7 +1497,7 @@ int recursive_rmdir(const char *dirpath, int recursive_depth)
 
     failure = recursive_rmdir_helper(dirpath, recursive_depth, &saved_errno);
     if (failure != 0) {
-        printf("Recursive delete dir failed. Try delete forcely with command\n");
+    	LOG_ERROR("Recursive delete dir failed. Try delete forcely with command\n");
         /*failure = exec_force_rmdir_command(dirpath);
         if (failure != 0) {
             ERROR("Recursive delete dir forcely with command failed");
@@ -1550,20 +1552,20 @@ int gzip_z(const char *srcfile, const char *dstfile, const mode_t mode)
 
     srcfd = open(srcfile, O_RDONLY, 0644);
     if (srcfd < 0) {
-        printf("Open src file: %s, failed: %s\n", srcfile, strerror(errno));
+    	LOG_ERROR("Open src file: %s, failed: %s\n", srcfile, strerror(errno));
         return -1; 
     }   
 
     stream = gzopen(dstfile, "w");
     if (stream == NULL) {
-        printf("gzopen %s error: %s\n", dstfile, strerror(errno));
+    	LOG_ERROR("gzopen %s error: %s\n", dstfile, strerror(errno));
         close(srcfd);
         return -1; 
     }   
 
     buffer = calloc_s(1, BLKSIZE);
     if (buffer == NULL) {
-        printf("out of memory\n");
+    	LOG_ERROR("out of memory\n");
         ret = -1; 
         goto out;
     }   
@@ -1571,7 +1573,7 @@ int gzip_z(const char *srcfile, const char *dstfile, const mode_t mode)
     while (true) {
         size = read_nointr(srcfd, buffer, BLKSIZE);
         if (size < 0) {
-            printf("read file %s failed: %s\n", srcfile, strerror(errno));
+        	LOG_ERROR("read file %s failed: %s\n", srcfile, strerror(errno));
             ret = -1; 
             break;
         } else if (size == 0) {
@@ -1582,14 +1584,14 @@ int gzip_z(const char *srcfile, const char *dstfile, const mode_t mode)
         if (n <= 0 || n != (size_t)size) {
             gzerr = gzerror(stream, &errnum);
             if (gzerr != NULL && strcmp(gzerr, "") != 0) {
-                printf("gzread error: %s\n", gzerr);
+            	LOG_ERROR("gzread error: %s\n", gzerr);
             }
             ret = -1;
             break;
         }
     }
     if (chmod(dstfile, mode) != 0) {
-        printf("Change mode of tar-split file\n");
+    	LOG_ERROR("Change mode of tar-split file\n");
         ret = -1;
     }
 
@@ -1599,7 +1601,7 @@ out:
     free(buffer);
     if (ret != 0) {
         if (path_remove(dstfile) != 0) {
-            printf("Remove file %s failed: %s\n", dstfile, strerror(errno));
+        	LOG_ERROR("Remove file %s failed: %s\n", dstfile, strerror(errno));
         }
     }
 
@@ -1628,13 +1630,13 @@ char *oci_default_tag(const char *name)
 	int nlen = 0;
 
     if (name == NULL) {
-        printf("Invalid NULL param\n");
+    	LOG_ERROR("Invalid NULL param\n");
         return NULL;
     }
 
     parts = string_split(name, '/', &nlen);
     if (parts == NULL) {
-        printf("split %s by '/' failed\n", name);
+    	LOG_ERROR("split %s by '/' failed\n", name);
         return NULL;
     }
 
@@ -1649,7 +1651,7 @@ char *oci_default_tag(const char *name)
     // Add image's default tag
     int nret = snprintf(temp, sizeof(temp), "%s%s", name, add_default_tag);
     if (nret < 0 || (size_t)nret >= sizeof(temp)) {
-        printf("sprint temp image name failed");
+    	LOG_ERROR("sprint temp image name failed");
         return NULL;
     }
 
@@ -1662,12 +1664,12 @@ char *oci_add_host(const char *host, const char *name) {
 	bool need_repo_prefix = false;
 
 	if(host == NULL || name == NULL) {
-		printf("Invalid NULL param\n");
+		LOG_ERROR("Invalid NULL param\n");
 		return NULL;
 	}
 	
 	if(strlen(host) == 0) {
-		printf("Invalid host");
+		LOG_ERROR("Invalid host");
 		return NULL;
 	}
 
@@ -1677,7 +1679,7 @@ char *oci_add_host(const char *host, const char *name) {
 
 	with_host = common_calloc_s(strlen(host) + strlen("/") + strlen(REPO_PREFIX_TO_STRIP) + strlen(name) + 1);
 	if(with_host == NULL) {
-		printf("out of memory\n");
+		LOG_ERROR("out of memory\n");
 		return NULL;
 	}
 	strcat(with_host, host);
@@ -1726,7 +1728,7 @@ bool valid_image_name(const char *name) {
 	bool bret = false;
 
 	if(name == NULL) {
-		printf("invalid NULL param\n");
+		LOG_ERROR("invalid NULL param\n");
 		return false;
 	}
 

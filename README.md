@@ -82,18 +82,17 @@ Linux下对于docker容器引擎的简单模拟
 	  /var/lib/docker-mini/overlay/l/f2299249489af33a4fce380361:  
 	  /var/lib/docker-mini/overlay/l/ab6e6b5bacd8f5060576108e5b:  
 	  /var/lib/docker-mini/overlay/l/f191ad573e2d31f5169d0f9006,  
-	  upperdir=/var/lib/docker-mini/overlay/<container-id>/diff,workdir=/var/lib/docker-mini/overlay/<container-id>/work"。
+	  upperdir=/var/lib/docker-mini/overlay/\<container-id\>/diff,workdir=/var/lib/docker-mini/overlay/\<container-id\>/work"。
 	
 	* [网络配置](https://blog.csdn.net/qq_36733838/article/details/127592976)
 	  
-	1. 新建网桥docker0，为其分配ip地址。使用nat地址转换使得虚拟机内网可以访问外网。
+	1. 新建网桥docker-mini0，为其分配ip地址。使用nat地址转换使得虚拟机内网可以访问外网。
 	2. 创建虚拟网卡veth2及其配对veth1，两者通过netlink通信。
 	   其中veth1连接到网桥，veth2作为网卡放入运行容器内并将其取名为eth0。
 	3. 设置容器网卡ip和子网掩码，启动veth1、veth2，将容器网关地址设为网桥地址。
-	4. 设置容器mac地址。  
+	4. 设置容器mac地址  
 
 	* clone创建namespace  
-
 
 	1. CLONE_NEWPID标志位通过置零父子进程间共享pid namespace，使得宿主机操作系统内核为子进程创建新的pid namespace。高级别namespace可以看到低级别namespace的pid，反之不可。
 	2. CLONE_NEWNS标志位置零进程间挂载点共享，为容器提供挂载点隔离，每个mount namespace都拥有一份自己的挂载点列表，低级别映射无法影响到高级别挂载点。
@@ -201,7 +200,7 @@ Linux下对于docker容器引擎的简单模拟
 
 后续
 ------------
-* 添加日志模块。
+* 多线程拉取镜像。
 
 * 完善cpu、memory quota。
 

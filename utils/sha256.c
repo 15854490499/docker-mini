@@ -28,6 +28,7 @@
 #endif
 
 #include "sha256.h"
+#include "log.h"
 #define BLKSIZE 32768
 
 char* calc_full_digest(const char *digest)
@@ -36,13 +37,13 @@ char* calc_full_digest(const char *digest)
     char full_digest[PATH_MAX] = { 0 }; 
 
     if (digest == NULL) {
-        printf("invalid NULL digest\n");
+    	LOG_ERROR("invalid NULL digest\n");
         return NULL;
     }    
 
     nret = snprintf(full_digest, sizeof(full_digest), "%s%s", SHA256_PREFIX, digest);
     if (nret < 0 || (size_t)nret >= sizeof(full_digest)) {
-        printf("digest too long failed\n");
+    	LOG_ERROR("digest too long failed\n");
         return NULL;
     }    
 
@@ -84,7 +85,7 @@ char *sha256_digest_str(const char *val)
 
 char* without_sha256_prefix(char* digest) {
 	if(digest == NULL) {
-		printf("Invalid digest when strip sha256 prefix\n");
+		LOG_ERROR("Invalid digest when strip sha256 prefix\n");
 		return NULL;
 	}
 	return digest + strlen(SHA256_PREFIX);
@@ -120,26 +121,26 @@ char *make_big_data_base_name(const char *key)
 	encoded_size = 65536;//EVP_EncodedLength(&encoded_size, strlen(key));
 	b64_encode_name = calloc_s(1, encoded_size);
 	if (EVP_EncodeBlock((uint8_t *)(b64_encode_name), (const uint8_t *)key, strlen(key)) == 0) {
-        printf("Encode base64 failed: %s\n", strerror(errno));
+    	LOG_ERROR("Encode base64 failed: %s\n", strerror(errno));
         goto out; 
     } 
     if (nret < 0) {
         ret = -1; 
-        printf("Encode auth to base64 failed\n");
+    	LOG_ERROR("Encode auth to base64 failed\n");
         goto out;
     }   
     name_size = 1 + strlen(b64_encode_name) + 1; // '=' + encode string + '\0'
 
     base_name = (char *)calloc_s(sizeof(char), name_size);
     if (base_name == NULL) {
-        printf("Out of memory\n");
+    	LOG_ERROR("Out of memory\n");
         ret = -1; 
         goto out;
     }   
 
     nret = snprintf(base_name, name_size, "=%s", b64_encode_name);
     if (nret < 0 || (size_t)nret >= name_size) {
-        printf("Out of memory\n");
+    	LOG_ERROR("Out of memory\n");
         ret = -1; 
         goto out;
     }   

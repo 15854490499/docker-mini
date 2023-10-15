@@ -47,6 +47,7 @@
 
 #include "network.h"
 #include "nl.h"
+#include "log.h"
 
 #if HAVE_IFADDRS_H
 #include <ifaddrs.h>
@@ -560,7 +561,7 @@ int setup_hw_addr(char *hwaddr, const char *ifname)
 
 	ret = lxc_convert_mac(hwaddr, &sockaddr);
 	if (ret) {
-		printf("mac address '%s' conversion failed : %d`\n",
+		LOG_ERROR("mac address '%s' conversion failed : %d`\n",
 		      hwaddr, -ret);
 		return -1;
 	}
@@ -571,14 +572,14 @@ int setup_hw_addr(char *hwaddr, const char *ifname)
 
 	fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (fd < 0) {
-		printf("socket failure : %d\n", errno);
+		LOG_ERROR("socket failure : %d\n", errno);
 		return -1;
 	}
 
 	ret = ioctl(fd, SIOCSIFHWADDR, &ifr);
 	close(fd);
 	if (ret)
-		printf("ioctl failure : %d\n", errno);
+		LOG_ERROR("ioctl failure : %d\n", errno);
 
 	//printf("mac address '%s' on '%s' has been setup\n", hwaddr, ifr.ifr_name);
 	return ret;

@@ -6,6 +6,7 @@ SUBDIR := utils \
 		  configs \
 		  http \
 		  libocispec \
+		  log \
 		  main \
 		  net \
 		  registry \
@@ -44,6 +45,8 @@ OBJ := network.o nl.o http.o utils.o sha256.o timestamp.o \
 		 oci_image_manifest.o \
 		 oci_image_content_descriptor.o \
 		 oci_image_spec.o \
+		 asynclog.o \
+		 log.o \
 		 configs_constants.o \
 		 archive.o \
 		 fs.o \

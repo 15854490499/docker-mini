@@ -31,7 +31,7 @@ extern "C" {
 #define SIZE_TB (1024LL * SIZE_GB)
 #define SIZE_PB (1024LL * SIZE_TB)
 struct Buffer {
-	char* contents;
+	char *contents;
 	size_t bytes_used;
 	size_t total_size;
 };

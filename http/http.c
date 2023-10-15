@@ -6,6 +6,8 @@
 #include "sha256.h"
 #include "registry.h"
 #include "storage.h"
+#include "log.h"
+
 size_t fwrite_file(const void *ptr, size_t size, size_t nmemb, void *stream) {
 	size_t written = fwrite(ptr, size, nmemb, (FILE*)stream);
 	return written;
@@ -23,7 +25,7 @@ size_t fwrite_buffer(const char* ptr, size_t eltsize, size_t nmemb, void* buffer
 		int new_size = (buffer->total_size) * 2;
 		char* tmp = (char*)malloc(sizeof(char) * new_size);
 		if(tmp == NULL) {
-			printf("Out of memory\n");
+			LOG_ERROR("Out of memory\n");
 			return -1;
 		}
 		memcpy(tmp, buffer->contents, buffer->total_size);
@@ -45,7 +47,7 @@ size_t fwrite_buffer(const char* ptr, size_t eltsize, size_t nmemb, void* buffer
 		*(buffer->contents + buffer->bytes_used) = '\0';
 	}
 	if(status != 0) {
-		printf("Failed to write Buffer\n");
+		LOG_ERROR("Failed to write Buffer\n");
 		return -1;
 	}
 	return size;
@@ -75,7 +77,7 @@ static char* replace_url(const char* url) {
 	max = calc_replaced_url_len(url);
 	replaced_url = calloc((size_t)1, max);
 	if(replaced_url == NULL) {
-		printf("calloc error\n");
+		LOG_ERROR("calloc error\n");
 		return NULL;
 	}
 	for(size_t i = 0; i < size; i++) {
@@ -104,7 +106,7 @@ static int http_get_header_common(const unsigned int flag, const char *key, cons
 
     // format   key: value
     if (strlen(value) > (SIZE_MAX - strlen(key)) - extra_char_len) {
-        printf("Invalid authorization option");
+    	LOG_ERROR("Invalid authorization option");
         return -1;
     }
 
@@ -112,13 +114,13 @@ static int http_get_header_common(const unsigned int flag, const char *key, cons
     len = strlen(key) + strlen(value) + extra_char_len;
     header = calloc((size_t)1, len);
     if (header == NULL) {
-        printf("Out of memory");
+    	LOG_ERROR("Out of memory");
         return -1;
     }
 
     nret = snprintf(header, len, "%s: %s", key, value);
     if (nret < 0 || (size_t)nret >= len) {
-        printf("Failed to print string");
+    	LOG_ERROR("Failed to print string");
     } else {
         *chunk = curl_slist_append(*chunk, header);
     }
@@ -240,18 +242,18 @@ static int ensure_path_file(char** rpath, void* output, bool resume, FILE** page
 	path = (char*)output;
 	fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0640);
 	if(fd < 0 && errno != EEXIST) {
-		printf("create file err!\n");
+		LOG_ERROR("create file err!\n");
 		goto err;
 	}
 	if(realpath(path, real_path) == NULL) {
-		printf("get real path err!\n");
+		LOG_ERROR("get real path err!\n");
 		goto err;
 	}
 	*rpath = strdup(real_path);
 	if(resume) {
 		mode = "a";
 		if(stat(*rpath, &st) < 0) {
-			printf("stat %s failed: %s", *rpath, strerror(errno));
+			LOG_ERROR("stat %s failed: %s", *rpath, strerror(errno));
 			return -1;
 		}
 		*fsize = (size_t)st.st_size;
@@ -264,12 +266,12 @@ static int ensure_path_file(char** rpath, void* output, bool resume, FILE** page
 		fdmode = O_RDWR | O_TRUNC | O_CREAT;
 	f_fd = open(*rpath, (int)fdmode, 0666);
 	if(f_fd < 0) {
-		printf("open file err!\n");
+		LOG_ERROR("open file err!\n");
 		goto err;
 	}
 	*pagefile = fdopen(f_fd, mode);
 	if(*pagefile == NULL) {
-		printf("fdopen err!\n");
+		LOG_ERROR("fdopen err!\n");
 		close(f_fd);
 		goto err;
 	}
@@ -362,7 +364,7 @@ int http_request(const char* url, struct http_get_options* options, long* respon
 	} else {}
 	curl_result = curl_easy_perform(curl_handle);
 	if(curl_result != CURLE_OK) {
-		printf("curl_result != CURLE_OK\n");
+		LOG_ERROR("curl_result != CURLE_OK\n");
 		check_buf_len(options, errbuf, curl_result);
 		ret = -1;
 	} else {
@@ -389,7 +391,7 @@ out:
 			options->with_header_auth = 0;
 		}
 		if(http_request(redir_url, options, response_code, recursive_len + 1)) {
-			printf("Failed to get http request\n");
+			LOG_ERROR("Failed to get http request\n");
 			ret = -1;
 		}
 		free(redir_url);
@@ -420,13 +422,13 @@ static int on_header_field(http_parser* parser, const char* buf, size_t len) {
 	struct parsed_http_message* m= parser->data;
 	if(m->last_header_element != FIELD) {
 		if(m->num_headers + 1 >= MAX_HEADERS) {
-			printf("too many headers exceeded\n");
+			LOG_ERROR("too many headers exceeded\n");
 			return -1;
 		}
 		m->num_headers++;
 	}
 	if(m->num_headers == 0) {
-		printf("Failed to parse header\n");
+		LOG_ERROR("Failed to parse header\n");
 		return -1;
 	}
 	strlncat(m->headers[m->num_headers-1][0], sizeof(m->headers[m->num_headers-1][0]), buf, len);
@@ -437,7 +439,7 @@ static int on_header_field(http_parser* parser, const char* buf, size_t len) {
 static int on_header_value(http_parser* parser, const char* buf, size_t len) {
 	struct parsed_http_message* m = parser->data;
 	if(m->num_headers == 0) {
-		printf("Failed to parse header value\n");
+		LOG_ERROR("Failed to parse header value\n");
 		return -1;
 	}
 	strlncat(m->headers[m->num_headers-1][1], sizeof(m->headers[m->num_headers-1][1]), buf, len);
@@ -462,13 +464,13 @@ static int on_body(http_parser *parser, const char *buf, size_t len)
     size_t newsize;
     char *body = NULL;
     if (m->body_size > (SIZE_MAX - len) - 1) {
-        printf("http body size is too large!");
+    	LOG_ERROR("http body size is too large!");
         return -1;
     }
     newsize = m->body_size + len + 1;
     body = (char*)malloc(newsize);
     if (body == NULL) {
-        printf("Out of memory");
+    	LOG_ERROR("Out of memory");
         return -1;
     }
     if (m->body != NULL && m->body_size > 0) {
@@ -516,7 +518,7 @@ static int on_chunk_header(http_parser* parser) {
 static int on_chunk_complete(http_parser* parser) {
 	struct parsed_http_message* m = parser->data;
 	if(m->num_chunks != m->num_chunks_complete + 1) {
-		printf("chunk_header_cb is not matched\n");
+		LOG_ERROR("chunk_header_cb is not matched\n");
 		return -1;
 	}
 	m->num_chunks_complete++;
@@ -607,14 +609,14 @@ struct parsed_http_message* get_parsed_message(char* http_head) {
 
 	message = (struct parsed_http_message*)common_calloc_s(sizeof(struct parsed_http_message));
 	if(message == NULL) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		ret = -1;
 		goto out;
 	}
 
 	ret = parse_http_header(http_head, strlen(http_head), message);
 	if(ret != 0) {
-		printf("parse http header failed\n");
+		LOG_ERROR("parse http header failed\n");
 		ret = -1;
 		goto out;
 	}
@@ -630,7 +632,7 @@ char* get_header_value(const struct parsed_http_message* m, const char* header) 
 	int i = 0;
 	char* ret = NULL;
 	if(m == NULL || header == NULL) {
-		printf("Empty arguments\n");
+		LOG_ERROR("Empty arguments\n");
 		return NULL;
 	}
 	for(i = 0; i < m->num_headers; i++) {
@@ -654,19 +656,19 @@ int parse_ping_header(pull_descriptor* desc, char* http_head) {
 		goto out;
 	}
 	if(message->status_code != status_unauthorized && message->status_code != status_ok) {
-		printf("registry response invalid status code %d", message->status_code);
+		LOG_ERROR("registry response invalid status code %d", message->status_code);
 		ret = -1;
 		goto out;
 	}
 	version = get_header_value(message, "Docker-Distribution-Api-Version");
 	if(version == NULL || strcasecmp(version, "registry/2.0")) {
-		printf("version %s not supported", version);
+		LOG_ERROR("version %s not supported", version);
 		ret = -1;
 		goto out;	
 	}
 	ret = parse_auth(desc, message);
 	if(ret != 0) {
-		printf("Parse www-authenticate header failed\n");
+		LOG_ERROR("Parse www-authenticate header failed\n");
 		goto out;
 	}
 out:
@@ -686,7 +688,7 @@ int parse_http_header(const char *http_head, int head_len, struct parsed_http_me
 
 	real_message = strstr(http_head, "HTTP/1.1");
 	if(real_message == NULL) {
-		printf("Failed to parse response, the response do not have HTTP/1.1\n");
+		LOG_ERROR("Failed to parse response, the response do not have HTTP/1.1\n");
 		ret = -1;
 		goto out;
 	}
@@ -702,7 +704,7 @@ int parse_http_header(const char *http_head, int head_len, struct parsed_http_me
 	int len = strlen(real_message);
 	nparsed = http_parser_execute(parser, &g_settings, real_message, len);
 	if(nparsed != len) {
-		printf("Failed to parse it, parsed : %d, input : %d\n", ret, len);
+		LOG_ERROR("Failed to parse it, parsed : %d, input : %d\n", ret, len);
 		ret = -1;
 		goto free_out;
 	}
@@ -759,7 +761,7 @@ static int http_request_token(pull_descriptor *desc, challenge *c, char **output
 
 	ret = http_request(url, options, NULL, 0);
 	if(ret) {
-		printf("Failed to get http request: %s\n", options->errmsg);
+		LOG_ERROR("Failed to get http request: %s\n", options->errmsg);
 		ret = -1;
 		goto out;
 	}
@@ -779,7 +781,7 @@ static char *auth_header_str(const char *schema, const char *value)
     size_t auth_header_len = 0;
 
     if (schema == NULL || value == NULL) {
-        printf("Invalid NULL pointer");
+    	LOG_ERROR("Invalid NULL pointer");
         return NULL;
     }   
 
@@ -788,7 +790,7 @@ static char *auth_header_str(const char *schema, const char *value)
     auth_header_len = strlen("Authorization") + strlen(": ") + strlen(schema) + strlen(" ") + strlen(value) + 1;
     auth_header = calloc_s(1, auth_header_len);
     if (auth_header == NULL) {
-        printf("out of memory");
+    	LOG_ERROR("out of memory");
         ret = -1; 
         goto out;
     }   
@@ -796,7 +798,7 @@ static char *auth_header_str(const char *schema, const char *value)
     sret = snprintf(auth_header, auth_header_len, "Authorization: %s %s", schema, value);
     if (sret < 0 || (size_t)sret >= auth_header_len) {
         ret = -1; 
-        printf("Failed to sprintf authorization");
+    	LOG_ERROR("Failed to sprintf authorization");
         goto out;
     }   
 
@@ -827,21 +829,21 @@ static int get_bearer_token(pull_descriptor* desc, struct http_get_options* opti
 			c->expires_time = 0;
 			ret = http_request_token(desc, c, &output);
 			if(ret != 0 || output == NULL) {
-				printf("get token err!\n");
+				LOG_ERROR("get token err!\n");
 				ret = -1;
 				goto out;
 			}
 			registry_token* token = registry_token_parse_data(output, NULL, &err);
 			if(token == NULL) {
 				ret = -1;
-				printf("parse token from response failed!\n");
+				LOG_ERROR("parse token from response failed!\n");
 				goto out;
 			}	
 			if(token->token != NULL) {
 				c->cached_token = strdup_s(token->token);
 			} else {
 				ret = -1;
-				printf("no valid token found!\n");
+				LOG_ERROR("no valid token found!\n");
 				goto out;
 			}
 			if(token->expires_in > MIN_TOKEN_EXPIRES_IN) {
@@ -855,7 +857,7 @@ static int get_bearer_token(pull_descriptor* desc, struct http_get_options* opti
 			}
 			ret = array_append(&options->custom_headers, (const char*)auth_header);
 			if(ret != 0) {
-				printf("append custom headers failed\n");
+				LOG_ERROR("append custom headers failed\n");
 				ret = -1;
 				goto out;
 			}
@@ -881,18 +883,18 @@ int http_request_buf(pull_descriptor* desc, const char* url, const char** custom
 	struct http_get_options* options = NULL;
 	Buffer* output_buffer = NULL;
 	if(desc == NULL || url == NULL || output == NULL) {
-		printf("Invalid NULL pointer\n");
+		LOG_ERROR("Invalid NULL pointer\n");
 		return -1;
 	}
 	options = (struct http_get_options *)calloc_s(1, sizeof(struct http_get_options));
 	output_buffer = buffer_alloc(HTTP_GET_BUFFER_SIZE);
 	if(options == NULL) {
-		printf("Failed to malloc http_get_options\n");
+		LOG_ERROR("Failed to malloc http_get_options\n");
 		ret = -1;
 		goto out;
 	}
 	if(output_buffer == NULL) {
-		printf("Failed to malloc output_buffer\n");
+		LOG_ERROR("Failed to malloc output_buffer\n");
 		ret = -1;
 		goto out;	
 	}
@@ -905,7 +907,7 @@ int http_request_buf(pull_descriptor* desc, const char* url, const char** custom
 	if(custom_headers != NULL) {
 		options->custom_headers = str_array_dup(custom_headers, array_len(custom_headers));
 		if(options->custom_headers == NULL) {
-			printf("dup headers failed\n");
+			LOG_ERROR("dup headers failed\n");
 			ret = -1;
 			goto out;
 		}
@@ -916,7 +918,7 @@ int http_request_buf(pull_descriptor* desc, const char* url, const char** custom
 	options->timeout = true;
 	ret = http_request(url, options, NULL, 0);
 	if(ret) {
-		printf("Failed to get http request: %s\n", options->errmsg);
+		LOG_ERROR("Failed to get http request: %s\n", options->errmsg);
 		ret = -1;
 		goto out;
 	}
@@ -949,7 +951,7 @@ int http_request_file(pull_descriptor* desc, const char* url, const char** custo
 	if(custom_headers != NULL) {
 		options->custom_headers = str_array_dup(custom_headers, array_len(custom_headers));
 		if(options->custom_headers == NULL) {
-			printf("dup headers failed\n");
+			LOG_ERROR("dup headers failed\n");
 			ret = -1;
 			goto out;		
 		}
@@ -957,7 +959,7 @@ int http_request_file(pull_descriptor* desc, const char* url, const char** custo
 	ret = get_bearer_token(desc, options);
 	ret = http_request(url, options, NULL, 0);
 	if(ret != 0) {
-		printf("Failed to get http request: %s\n", options->errmsg);
+		LOG_ERROR("Failed to get http request: %s\n", options->errmsg);
 		ret = -1;
 	}
 out:

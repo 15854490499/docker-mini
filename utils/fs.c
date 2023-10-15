@@ -13,6 +13,8 @@
 
 #include "fs.h"
 #include "utils.h"
+#include "log.h"
+
 #ifndef JFS_SUPER_MAGIC
 #define JFS_SUPER_MAGIC 0x3153464a
 #endif
@@ -157,14 +159,14 @@ bool detect_mounted(const char *path) {
 
 	fp = fopen("/proc/self/mountinfo", "r");
 	if(fp == NULL) {
-		printf("Failed opening /proc/self/mountinfo\n");
+		LOG_ERROR("Failed opening /proc/self/mountinfo\n");
 		return false;
 	}
 
 	while(getline(&line, &length, fp) != -1) {
 		mountpoint = get_mtpoint(line);
 		if(mountpoint == NULL) {
-			printf("Error reading mountinfo: bad line '%s'\n", line);
+			LOG_ERROR("Error reading mountinfo: bad line '%s'\n", line);
 			continue;
 		}
 		if(strcmp(mountpoint, path) == 0) {
@@ -190,14 +192,12 @@ static bool is_remount(const char *src, unsigned long mntflags)
 }
 
 int force_mount(const char *src, const char *dst, const char *mtype, unsigned long mntflags, const char *mntdata) {
-	printf("===============force_mount===================\n");
 	int ret = 0;
 	unsigned long oflags = mntflags & (~PROPAGATION_TYPES);
 	if(!is_remount(src, mntflags) || (mntdata != NULL && strcmp(mntdata, "") != 0)) {
-		printf("%s %s %s %s\n", src, dst, mtype, mntdata);
 		ret = mount(src, dst, mtype, oflags, mntdata);
 		if(ret < 0) {
-			printf("Failed to mount %s to %s:%s\n", src, dst, strerror(errno));
+			LOG_ERROR("Failed to mount %s to %s:%s\n", src, dst, strerror(errno));
 			goto out;
 		}
 	}
@@ -205,7 +205,7 @@ int force_mount(const char *src, const char *dst, const char *mtype, unsigned lo
 	if((mntflags & PROPAGATION_TYPES) != 0) {
 		ret = mount("", dst, "", mntflags & PROPAGATION_FLAGS, "");
 		if(ret < 0) {
-			printf("Failed to change the propagation type of dst %s:%s\n", dst, strerror(errno));
+			LOG_ERROR("Failed to change the propagation type of dst %s:%s\n", dst, strerror(errno));
 			goto out;
 		}
 	}
@@ -213,12 +213,11 @@ int force_mount(const char *src, const char *dst, const char *mtype, unsigned lo
 	if((oflags & BRO_FLAGS) == BRO_FLAGS) {
 		ret = mount("", dst, "", oflags | MS_REMOUNT, "");
 		if(ret < 0) {
-			printf("Failed to remount the bind to apply read only of dst %s:%s\n", dst, strerror(errno));
+			LOG_ERROR("Failed to remount the bind to apply read only of dst %s:%s\n", dst, strerror(errno));
 			goto out;
 		}
 	}
 out:
-	printf("************force_mount*******************\n");
 	return ret;
 }
 
@@ -231,7 +230,7 @@ int pre_mount(const char *src, const char *dst, const char *mtype, unsigned long
 	
 	if((mntflags & MS_REMOUNT) != MS_REMOUNT) {
 		if(detect_mounted(dst)) {
-			printf("mount dst %s has been mounted, skip mount\n", dst);
+			LOG_ERROR("mount dst %s has been mounted, skip mount\n", dst);
 			ret = 0;
 			goto out;
 		}
@@ -277,7 +276,7 @@ int util_mount(const char *src, const char *dst, const char *mtype, unsigned lon
 
 	if((mntflags & MS_REMOUNT) != MS_REMOUNT) {
 		if(detect_mounted(dst)) {
-			printf("mount dst %s had been mounted\n", dst);
+			LOG_ERROR("mount dst %s had been mounted\n", dst);
 			ret = 0;
 			goto out;
 		}
@@ -300,14 +299,14 @@ bool support_d_type(const char *path)
 
     dir = opendir(path);
     if (dir == NULL) {
-        printf("opendir %s failed.\n", path);
+    	LOG_ERROR("opendir %s failed.\n", path);
         return false;
     }
 
     entry = readdir(dir);
     for (; entry != NULL; entry = readdir(dir)) {
         if (entry->d_type == DT_UNKNOWN) {
-            printf("d_type found to be DT_UNKNOWN\n");
+        	LOG_ERROR("d_type found to be DT_UNKNOWN\n");
             is_support_d_type = false;
             break;
         }
@@ -332,7 +331,7 @@ int list_all_subdir(const char *directory, char ***out, size_t *nlen)
 
     dir = opendir(directory);
     if (dir == NULL) {
-        printf("Failed to open directory: %s error:%s\n", directory, strerror(errno));
+    	LOG_ERROR("Failed to open directory: %s error:%s\n", directory, strerror(errno));
         return -1;
     }    
     direntp = readdir(dir);
@@ -343,15 +342,15 @@ int list_all_subdir(const char *directory, char ***out, size_t *nlen)
 
         nret = snprintf(tmpdir, PATH_MAX, "%s/%s", directory, direntp->d_name);
         if (nret < 0 || nret >= PATH_MAX) {
-            printf("Sprintf: %s failed\n", direntp->d_name);
+        	LOG_ERROR("Sprintf: %s failed\n", direntp->d_name);
             goto error_out;
         }
         if (!dir_exists(tmpdir)) {
-            printf("%s is not directory\n", direntp->d_name);
+        	LOG_ERROR("%s is not directory\n", direntp->d_name);
             continue;
         }
         if (array_append(&names_array, direntp->d_name)) {
-            printf("Failed to append subdirectory array\n");
+        	LOG_ERROR("Failed to append subdirectory array\n");
             goto error_out;
         }
 		len++;

@@ -4,6 +4,7 @@
 #include "parse_cmd.h"
 #include "docker.h"
 #include "utils.h"
+#include "log.h"
 
 void command_parameters_init(struct command_parameter **cmd) {
 	*cmd = (struct command_parameter*)common_calloc_s(sizeof(struct command_parameter));

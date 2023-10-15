@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 
 #include "layer.h"
+#include "log.h"
 #include "timestamp.h"
 #include "archive.h"
 
@@ -32,7 +33,7 @@ static int driver_create_layer(const char *id, const char *parent, bool writable
         if (opt->mount_opts != NULL) {
             c_opts.storage_opt = calloc_s(1, sizeof(json_map_string_string));
             if (c_opts.storage_opt == NULL) {
-                printf("Out of memory\n");
+            	LOG_ERROR("Out of memory\n");
                 ret = -1;
                 goto free_out;
             }
@@ -40,7 +41,7 @@ static int driver_create_layer(const char *id, const char *parent, bool writable
                 ret = append_json_map_string_string(c_opts.storage_opt, opt->mount_opts->keys[i],
                                                     opt->mount_opts->values[i]);
                 if (ret != 0) { 
-                    printf("Out of memory\n");
+                	LOG_ERROR("Out of memory\n");
                     goto free_out;
                 }
             }
@@ -54,9 +55,9 @@ static int driver_create_layer(const char *id, const char *parent, bool writable
     }    
     if (ret != 0) { 
         if (id != NULL) {
-            printf("error creating %s layer with ID %s\n", writable ? "read-write" : "read-only", id); 
+        	LOG_ERROR("error creating %s layer with ID %s\n", writable ? "read-write" : "read-only", id); 
         } else {
-            printf("error creating %s layer\n", writable ? "read-write" : ""); 
+        	LOG_ERROR("error creating %s layer\n", writable ? "read-write" : ""); 
         }
         goto free_out;
     }    
@@ -73,7 +74,7 @@ layer_t *create_empty_layer() {
 
 	res = (layer_t*)calloc_s(sizeof(layer_t), 1);
 	if(res == NULL) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		goto err_out;
 	}
 	res->refcnt = 1;
@@ -90,7 +91,7 @@ static inline char *layer_json_path(const char *id) {
 	res = (char*)common_calloc_s(PATH_MAX);
 	nret = sprintf(res, "%s/%s/layer.json", g_root_dir, id);
 	if(nret < 0 || nret > PATH_MAX) {
-		printf("Create tar split path failed\n");
+		LOG_ERROR("Create tar split path failed\n");
 		return NULL;
 	}
 	return res;
@@ -105,7 +106,7 @@ static int update_layer_datas(const char *id, const struct layer_opts *opts, lay
 
     slayer = calloc_s(sizeof(storage_layer), 1);
     if (slayer == NULL) {
-        printf("Out of memory\n");
+    	LOG_ERROR("Out of memory\n");
         ret = -1;
         goto free_out;
     }    
@@ -117,7 +118,7 @@ static int update_layer_datas(const char *id, const struct layer_opts *opts, lay
         slayer->mountlabel = strdup_s(opts->opts->mount_label);
     }    
     if (!get_now_local_utc_time_buffer(timebuffer, TIME_STR_SIZE)) {
-        printf("Get create time failed");
+    	LOG_ERROR("Get create time failed");
         ret = -1;
         goto free_out;
     }    
@@ -126,7 +127,7 @@ static int update_layer_datas(const char *id, const struct layer_opts *opts, lay
     if (opts->names_len > 0) { 
         slayer->names = calloc_s(1, sizeof(char *) * opts->names_len);
         if (slayer->names == NULL) {
-            printf("Out of memory");
+        	LOG_ERROR("Out of memory");
             ret = -1;
             goto free_out;
         }
@@ -160,7 +161,7 @@ static bool build_layer_dir(const char *id) {
 	result = (char*)common_calloc_s(PATH_MAX);
 	nret = sprintf(result, "%s/%s", g_root_dir, id);
 	if(nret < 0 || nret > PATH_MAX) {
-		printf("create layer json path failed\n");
+		LOG_ERROR("create layer json path failed\n");
 		return false;
 	}
 
@@ -178,7 +179,7 @@ static bool append_layer_into_list(layer_t *l) {
 		return true;
 	elem = (struct layer_list_elem*)calloc_s(sizeof(struct layer_list_elem), 1);
 	if(elem == NULL) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		return false;
 	}
 	elem->layer_id = l->slayer->id;
@@ -203,7 +204,7 @@ static bool delete_layer_from_list(layer_t *l) {
 		elem = elem->next;
 	}
 	if(elem == NULL) {
-		printf("Cannot find the target layer\n");
+		LOG_ERROR("Cannot find the target layer\n");
 		return false;
 	}
 	return true;
@@ -237,7 +238,7 @@ static int save_mount_point(layer_t *layer)
 
     jstr = storage_mount_point_generate_json(layer->smount_point, NULL, &jerr);
     if (jstr == NULL) {
-        printf("Marsh mount point failed: %s\n", jerr);
+    	LOG_ERROR("Marsh mount point failed: %s\n", jerr);
         goto out;
     }   
 
@@ -257,7 +258,7 @@ static int umount_helper(layer_t *l, bool force) {
 
 	ret = graphdriver_umount_layer(l->slayer->id);
 	if(ret != 0) {
-		printf("Call driver umount failed\n");
+		LOG_ERROR("Call driver umount failed\n");
 		ret = -1;
 		goto out;
 	}
@@ -276,7 +277,7 @@ int layer_store_umount(const char *id, bool force) {
 	}
 	l = lookup(id);
 	if(l == NULL) {
-		printf("layer not known, skip umount\n");
+		LOG_ERROR("layer not known, skip umount\n");
 		return 0;
 	}
 	ret = umount_helper(l, force);
@@ -287,7 +288,7 @@ static int remove_memory_stores(const char *id) {
 	layer_t *l = NULL;
 	l = lookup(id);
 	if(l == NULL) {
-		printf("cannot find the target layer by id %s\n", id);
+		LOG_ERROR("cannot find the target layer by id %s\n", id);
 		return -1;
 	}
 	if(!delete_layer_from_list(l)) {
@@ -336,7 +337,7 @@ static int layer_store_remove_layer(const char *id) {
 	rpath = (char*)common_calloc_s(PATH_MAX);
 	nret = sprintf(rpath, "%s/%s", g_root_dir, id);
 	if(nret < 0 || nret > PATH_MAX) {
-		printf("Create layer json path failed\n");
+		LOG_ERROR("Create layer json path failed\n");
 		return -1;
 	}
 
@@ -356,22 +357,22 @@ int layer_store_delete(const char *id) {
 
 	l = lookup(id);
 	if(l == NULL) {
-		printf("layer %s not exists already, return success\n", id);
+		LOG_ERROR("layer %s not exists already, return success\n", id);
 		goto free_out;
 	}
 
 	if(umount_helper(l, true) != 0) {
 		ret = -1;
-		printf("Failed to umount layer %s\n", l->slayer->id);
+		LOG_ERROR("Failed to umount layer %s\n", l->slayer->id);
 		goto free_out;
 	}
 	if (l->mount_point_json_path != NULL && path_remove(l->mount_point_json_path) != 0) {
-        printf("Can not remove mount point file of layer %s, just ignore.\n", l->mount_point_json_path);
+    	LOG_ERROR("Can not remove mount point file of layer %s, just ignore.\n", l->mount_point_json_path);
     }
 
 	tspath = tar_split_path(l->slayer->id);
 	if(tspath != NULL && path_remove(tspath) != 0) {
-		printf("Can not remove layer files, just ignore\n");
+		LOG_ERROR("Can not remove layer files, just ignore\n");
 	}
 
 	ret = remove_memory_stores(l->slayer->id);
@@ -381,7 +382,7 @@ int layer_store_delete(const char *id) {
 
 	ret = graphdriver_rm_layer(l->slayer->id);
 	if(ret != 0) {
-		printf("Remove layer : %s by driver failed\n", l->slayer->id);
+		LOG_ERROR("Remove layer : %s by driver failed\n", l->slayer->id);
 		goto free_out;
 	}
 
@@ -451,7 +452,7 @@ static int make_tar_split_file(const char *lid, const struct io_read_wrapper *di
     // step 1: read header;
     tfd = open(save_fname, O_WRONLY | O_CREAT, 0666);
     if (tfd == -1) {
-        printf("touch file failed");
+    	LOG_ERROR("touch file failed");
         goto out; 
     }    
     close(tfd);
@@ -475,7 +476,7 @@ static int make_tar_split_file(const char *lid, const struct io_read_wrapper *di
     // always remove tmp tar split file, even though gzip failed.
     // if remove failed, just log message
     if (path_remove(save_fname) != 0) { 
-        printf("remove tmp tar split failed");
+    	LOG_ERROR("remove tmp tar split failed");
     }    
 
 out:
@@ -510,7 +511,7 @@ static inline char *mountpoint_json_path(const char *id) {
 	result = (char*)common_calloc_s(PATH_MAX);
 	nret = sprintf(result, "%s/%s.json", g_run_dir, id);
 	if(nret < 0 || nret > PATH_MAX) {
-		printf("Create mount point json path failed\n");
+		LOG_ERROR("Create mount point json path failed\n");
 		return NULL;
 	}
 	return result;
@@ -524,14 +525,14 @@ static int update_mount_point(layer_t *l)
     if (l->smount_point == NULL) {
         l->smount_point = calloc_s(sizeof(storage_mount_point), 1);
         if (l->smount_point == NULL) {
-            printf("Out of memory\n");
+        	LOG_ERROR("Out of memory\n");
             return -1;
         }
     }    
 
     d_meta = graphdriver_get_metadata(l->slayer->id);
     if (d_meta == NULL) {
-        printf("Get metadata of driver failed\n");
+    	LOG_ERROR("Get metadata of driver failed\n");
         ret = -1;
         goto out; 
     }    
@@ -543,7 +544,7 @@ static int update_mount_point(layer_t *l)
     if (l->mount_point_json_path == NULL) {
         l->mount_point_json_path = mountpoint_json_path(l->slayer->id);
         if (l->mount_point_json_path == NULL) {
-            printf("Failed to get layer %s mount point json\n", l->slayer->id);
+        	LOG_ERROR("Failed to get layer %s mount point json\n", l->slayer->id);
             ret = -1;
             goto out; 
         }
@@ -560,17 +561,17 @@ static int save_layer(layer_t *layer) {
 	int ret = -1;
 
 	if(layer == NULL || layer->layer_json_path == NULL || layer->slayer == NULL) {
-		printf("Invalid arguments\n");
+		LOG_ERROR("Invalid arguments\n");
 		return ret;
 	}
 	jstr = storage_layer_generate_json(layer->slayer, NULL, &jerr);
 	if(jstr == NULL) {
-		printf("Marsh layer failed : %s\n", jerr);
+		LOG_ERROR("Marsh layer failed : %s\n", jerr);
 		goto out;
 	}
 	ret = atomic_write_file(layer->layer_json_path, jstr, strlen(jstr), 0666, false);
 	if(ret != 0) {
-		printf("atomic write layer : %s failed\n", layer->slayer->id);
+		LOG_ERROR("atomic write layer : %s failed\n", layer->slayer->id);
 	}
 out:
 	free(jstr);
@@ -583,7 +584,7 @@ int layer_store_create(const char *id, const struct layer_opts *opts, const stru
 	char *lid = NULL;
 	layer_t *l = NULL;
 	if(opts == NULL) {
-		printf("Invalid argument\n");
+		LOG_ERROR("Invalid argument\n");
 		return -1;
 	}
 	lid = strdup_s(id);
@@ -629,7 +630,7 @@ int layer_store_create(const char *id, const struct layer_opts *opts, const stru
 		l->hold_refs_num++;
 		goto free_out;
 	}
-	printf("save layer failed\n");
+	LOG_ERROR("save layer failed\n");
 clear_memory:
 	remove_memory_stores(lid);
 free_out:
@@ -669,7 +670,7 @@ struct layer *layer_store_lookup(const char *name) {
 
 	ret = common_calloc_s(sizeof(struct layer));
 	if(ret == NULL) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		return ret;
 	}
 	
@@ -683,7 +684,7 @@ static struct driver_mount_opts *fill_driver_mount_opts(const layer_t *l)
 
     d_opts = common_calloc_s(sizeof(struct driver_mount_opts));
     if (d_opts == NULL) {
-        printf("Out of meoroy\n");
+    	LOG_ERROR("Out of meoroy\n");
         goto err_out;
     }
 
@@ -706,7 +707,7 @@ static char *mount_helper(layer_t *l)
 
     nret = update_mount_point(l);
     if (nret != 0) {
-        printf("Failed to update mount point\n");
+    	LOG_ERROR("Failed to update mount point\n");
         return NULL;
     }
 
@@ -718,13 +719,13 @@ static char *mount_helper(layer_t *l)
 
     d_opts = fill_driver_mount_opts(l);
     if (d_opts == NULL) {
-        printf("Failed to fill layer %s driver mount opts\n", l->slayer->id);
+    	LOG_ERROR("Failed to fill layer %s driver mount opts\n", l->slayer->id);
         goto out;
     }
 
     mount_point = graphdriver_mount_layer(l->slayer->id, d_opts);
     if (mount_point == NULL) {
-        printf("Call driver mount: %s failed\n", l->slayer->id);
+    	LOG_ERROR("Call driver mount: %s failed\n", l->slayer->id);
         goto out;
     }
 
@@ -744,18 +745,18 @@ char *layer_store_mount(const char *id)
     char *result = NULL;
 
     if (id == NULL) {
-        printf("Invalid arguments\n");
+    	LOG_ERROR("Invalid arguments\n");
         return NULL;
     }    
 
     l = lookup(id);
     if (l == NULL) {
-        printf("layer not known\n");
+    	LOG_ERROR("layer not known\n");
         return NULL;
     }    
     result = mount_helper(l);
     if (result == NULL) {
-        printf("Failed to mount layer %s\n", id); 
+    	LOG_ERROR("Failed to mount layer %s\n", id); 
     }    
 
     return result;
@@ -772,14 +773,14 @@ layer_t *load_layer(const char *fname, const char *mountpoint_fname) {
 	}
 	slayer = storage_layer_parse_file(fname, NULL, &err);
 	if(slayer == NULL) {
-		printf("Parse layer failed: %s\n", err);
+		LOG_ERROR("Parse layer failed: %s\n", err);
 		goto free_out;
 	}
 
 	if(mountpoint_fname != NULL && file_exists(mountpoint_fname)) {
 		smount_point = storage_mount_point_parse_file(mountpoint_fname, NULL, &err);
 		if(smount_point == NULL) {
-			printf("Parse mount point failed : %s\n", err);
+			LOG_ERROR("Parse mount point failed : %s\n", err);
 			goto free_out;
 		}
 	}
@@ -855,40 +856,40 @@ static bool load_layer_json_cb(const char *path_name, struct dirent *sub_dir, vo
 
 	nret = snprintf(tmpdir, PATH_MAX, "%s/%s", path_name, sub_dir->d_name);
 	if(nret < 0 || nret >= PATH_MAX) {
-		printf("sprintf: %s failed\n", sub_dir->d_name);
+		LOG_ERROR("sprintf: %s failed\n", sub_dir->d_name);
 		goto free_out;
 	}
 
 	if(!dir_exists(tmpdir)) {
-		printf("%s is not directory\n", sub_dir->d_name);
+		LOG_ERROR("%s is not directory\n", sub_dir->d_name);
 		goto free_out;
 	}
 
 	mount_point_path = mountpoint_json_path(sub_dir->d_name);
 	if(mount_point_path == NULL) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		goto free_out;
 	}
 
 	if (strlen(sub_dir->d_name) != LAYER_NAME_LEN) {
-        printf("%s is invalid subdir name\n", sub_dir->d_name);
+    	LOG_ERROR("%s is invalid subdir name\n", sub_dir->d_name);
         goto free_out;
     }
 
     rpath = layer_json_path(sub_dir->d_name);
     if (rpath == NULL) {
-        printf("%s is invalid layer\n", sub_dir->d_name);
+    	LOG_ERROR("%s is invalid layer\n", sub_dir->d_name);
         goto free_out;
     }
 
     l = load_layer(rpath, mount_point_path);
     if (l == NULL) {
-        printf("load layer: %s failed, remove it\n", sub_dir->d_name);
+    	LOG_ERROR("load layer: %s failed, remove it\n", sub_dir->d_name);
         goto free_out;
     }
 
 	if(!append_layer_into_list(l)) {
-		printf("Failed to append layer info to list\n");
+		LOG_ERROR("Failed to append layer info to list\n");
 		goto free_out;
 	}
 
@@ -916,13 +917,13 @@ int layer_store_init() {
 
 	nret = mkdir_p(g_root_dir, 0600);
 	if(nret != 0) {
-		printf("build root dir of layer store failed\n");
+		LOG_ERROR("build root dir of layer store failed\n");
 		goto free_out;
 	}
 	
 	nret = mkdir_p(g_run_dir, 0600);
 	if(nret != 0) {
-		printf("build run dir of layer failed\n");
+		LOG_ERROR("build run dir of layer failed\n");
 		goto free_out;
 	}
 
@@ -932,7 +933,7 @@ int layer_store_init() {
 	}
 	nret = graphdriver_init();
 	if(nret != 0) {
-		printf("overlay2 driver init failed\n");
+		LOG_ERROR("overlay2 driver init failed\n");
 		goto free_out;
 	}
 	return 0;

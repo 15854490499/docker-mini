@@ -10,6 +10,7 @@
 #include "utils.h"
 #include "archive.h"
 #include "fs.h"
+#include "log.h"
 #include "project_quota.h"
 
 #define DRIVER_OVERLAY_NAME "overlay"
@@ -45,12 +46,12 @@ static void check_link_file_valid(const char *fname) {
 	nret = stat(fname, &fstat);
 	if(nret != 0) {
 		if(errno == ENOENT) {
-			printf("[overlay2] : remove invalid symlink: %s\n", fname);
+			LOG_INFO("[overlay2] : remove invalid symlink: %s\n", fname);
 			if(path_remove(fname) != 0) {
-				printf("Failed to remove link path %s\n", fname);
+				LOG_ERROR("Failed to remove link path %s\n", fname);
 			}
 		} else {
-			printf("[overlay2]: Evaluate symlink %s failed\n", fname);
+			LOG_ERROR("[overlay2]: Evaluate symlink %s failed\n", fname);
 		}
 	}
 }
@@ -63,7 +64,7 @@ static void rm_invalid_symlink(const char *dirpath) {
 
 	directory = opendir(dirpath);
 	if(directory == NULL) {
-		printf("Failed to open %s\n", dirpath);
+		LOG_ERROR("Failed to open %s\n", dirpath);
 		return;
 	}
 	pdirent = readdir(directory);
@@ -75,14 +76,14 @@ static void rm_invalid_symlink(const char *dirpath) {
 		memset(fname, 0, sizeof(fname));
 		pathname_len = snprintf(fname, PATH_MAX, "%s/%s", dirpath, pdirent->d_name);
 		if(pathname_len < 0 || pathname_len >= PATH_MAX) {
-			printf("Pathname too long\n");
+			LOG_ERROR("Pathname too long\n");
 			continue;
 		}
 		check_link_file_valid(fname);
 	}
 	nret = closedir(directory);
 	if(nret) {
-		printf("Failed to close directory %s\n", dirpath);
+		LOG_ERROR("Failed to close directory %s\n", dirpath);
 	}
 	return;
 }
@@ -93,11 +94,11 @@ static int overlay2_create_home_directory(const char *_driver_home) {
 	
 	link_dir = path_join(_driver_home, OVERLAY_LINK_DIR);
 	if(link_dir == NULL) {
-		printf("unable to create overlay link directory %s.\n", _driver_home);
+		LOG_ERROR("unable to create overlay link directory %s.\n", _driver_home);
 		return -1;
 	}
 	if(mkdir_p(link_dir, 0766) != 0) {
-		printf("unable to create overlay home directory %s.\n", link_dir);
+		LOG_ERROR("unable to create overlay home directory %s.\n", link_dir);
 		ret = -1;
 		goto out;
 	}
@@ -113,7 +114,7 @@ static char *read_layer_lower_file(const char *layer_dir) {
 
 	lower_file = path_join(layer_dir, OVERLAY_LAYER_LOWER);
 	if(lower_file == NULL) {
-		printf("Failed to get lower %s\n", layer_dir);
+		LOG_ERROR("Failed to get lower %s\n", layer_dir);
 		goto out;
 	}
 
@@ -129,12 +130,12 @@ static int append_abs_lower_path(const char *_driver_home, const char *lower, ch
 
 	abs_path = path_join(_driver_home, lower);
 	if(!dir_exists(abs_path)) {
-		printf("Can't stat absolute layer:%s\n", abs_path);
+		LOG_ERROR("Can't stat absolute layer:%s\n", abs_path);
 		ret = -1;
 		goto out;
 	}
 	if(array_append(abs_lowers, abs_path) != 0) {
-		printf("Can't append absolute layer:%s\n", abs_path);
+		LOG_ERROR("Can't append absolute layer:%s\n", abs_path);
 		ret = -1;
 		goto out;
 	}
@@ -190,61 +191,61 @@ int overlay2_get_layer_metadata(const char *id, const struct graphdriver *driver
 	char *lower_dir = NULL;
 
 	if(id == NULL || driver == NULL || map_info == NULL) {
-		printf("invalid argument\n");
+		LOG_ERROR("invalid argument\n");
 		ret = -1;
 		goto out;
 	}
 
 	layer_dir = path_join(driver->home, id);
 	if (layer_dir == NULL) {
-        printf("Failed to join layer dir:%s\n", id);
+    	LOG_ERROR("Failed to join layer dir:%s\n", id);
         ret = -1;
         goto out;
     }
 
     work_dir = path_join(layer_dir, OVERLAY_LAYER_WORK);
     if (work_dir == NULL) {
-        printf("Failed to join layer work dir:%s\n", layer_dir);
+    	LOG_ERROR("Failed to join layer work dir:%s\n", layer_dir);
         ret = -1;
         goto out;
     }
     if (append_json_map_string_string(map_info, "WorkDir", work_dir) != 0) {
-        printf("Failed to append layer work dir:%s\n", work_dir);
+    	LOG_ERROR("Failed to append layer work dir:%s\n", work_dir);
         ret = -1;
         goto out; 
     }    
 
     merged_dir = path_join(layer_dir, OVERLAY_LAYER_MERGED);
     if (merged_dir == NULL) {
-        printf("Failed to join layer merged dir:%s\n", layer_dir);
+    	LOG_ERROR("Failed to join layer merged dir:%s\n", layer_dir);
         ret = -1;
         goto out; 
     }    
     if (append_json_map_string_string(map_info, "MergedDir", merged_dir) != 0) { 
-        printf("Failed to append layer merged dir:%s\n", merged_dir);
+    	LOG_ERROR("Failed to append layer merged dir:%s\n", merged_dir);
         ret = -1;
         goto out; 
     }    
 
     upper_dir = path_join(layer_dir, OVERLAY_LAYER_DIFF);
     if (upper_dir == NULL) {
-        printf("Failed to join layer upper_dir dir:%s\n", layer_dir);
+    	LOG_ERROR("Failed to join layer upper_dir dir:%s\n", layer_dir);
         ret = -1;
         goto out;
     }
     if (append_json_map_string_string(map_info, "UpperDir", upper_dir) != 0) {
-        printf("Failed to append layer upper dir:%s\n", upper_dir);
+    	LOG_ERROR("Failed to append layer upper dir:%s\n", upper_dir);
         ret = -1;
         goto out;
     }
 
     if (get_lower_dirs(layer_dir, driver, &lower_dir) != 0) {
-        printf("Failed to get layer lower dir:%s\n", layer_dir);
+    	LOG_ERROR("Failed to get layer lower dir:%s\n", layer_dir);
         ret = -1;
         goto out;
     }
     if (lower_dir != NULL && append_json_map_string_string(map_info, "LowerDir", lower_dir) != 0) {
-        printf("Failed to append layer lower dir:%s\n", lower_dir);
+    	LOG_ERROR("Failed to append layer lower dir:%s\n", lower_dir);
         ret = -1;
         goto out;
     }
@@ -266,30 +267,30 @@ container_inspect_graph_driver *graphdriver_get_metadata(const char *id)
     json_map_string_string *metadata = NULL;
 
     /*if (g_driver == NULL) {
-        printf("Driver not inited yet\n");
+    	LOG_ERROR("Driver not inited yet\n");
         return NULL;
     } */  
 
     if (id == NULL) {
-        printf("Invalid input arguments for get driver metadata\n");
+    	LOG_ERROR("Invalid input arguments for get driver metadata\n");
         goto free_out;
     }   
 
     inspect_driver = calloc_s(sizeof(container_inspect_graph_driver), 1);
     if (inspect_driver == NULL) {
-        printf("Out of memory\n");
+    	LOG_ERROR("Out of memory\n");
         goto free_out;
     }   
 
     inspect_driver->data = calloc_s(sizeof(container_inspect_graph_driver_data), 1);
     if (inspect_driver->data == NULL) {
-        printf("Out of memory\n");
+    	LOG_ERROR("Out of memory\n");
         goto free_out;
     }   
 
     metadata = calloc_s(sizeof(json_map_string_string), 1);
     if (metadata == NULL) {
-        printf("Out of memory\n");
+    	LOG_ERROR("Out of memory\n");
         goto free_out;
     }   
 
@@ -299,7 +300,7 @@ container_inspect_graph_driver *graphdriver_get_metadata(const char *id)
 
     ret = g_driver.ops->get_layer_metadata(id, &g_driver, metadata);
     if (ret != 0) {
-        printf("Failed to get metadata map info\n");
+    	LOG_ERROR("Failed to get metadata map info\n");
         goto free_out;
     }
 
@@ -330,7 +331,7 @@ container_inspect_graph_driver *graphdriver_get_metadata(const char *id)
             }
         }
     }*/ else {
-        printf("Unsupported driver %s\n", g_driver.name);
+    	LOG_ERROR("Unsupported driver %s\n", g_driver.name);
         ret = -1;
         goto free_out;
     }
@@ -354,28 +355,28 @@ int overlay2_apply_diff(const char *id, const struct graphdriver *driver, const 
 	char *err = NULL;
 	
 	if(id == NULL || driver == NULL || content == NULL) {
-		printf("invalid argument\n");
+		LOG_ERROR("invalid argument\n");
 		ret = -1;
 		goto out;
 	}
 
 	layer_dir = path_join(driver_home, id);
 	if(layer_dir == NULL) {
-		printf("failed to join layer dir: %s\n", id);
+		LOG_ERROR("failed to join layer dir: %s\n", id);
 		ret = -1;
 		goto out;
 	}
 
 	layer_diff = path_join(layer_dir, OVERLAY_LAYER_DIFF);
 	if(layer_diff == NULL) {
-		printf("Failed to join layer diff dir: %s\n", id);
+		LOG_ERROR("Failed to join layer diff dir: %s\n", id);
 		ret = -1;
 		goto out;
 	}
 
 	layer_diff = path_join(layer_dir, OVERLAY_LAYER_DIFF);
 	if(layer_diff == NULL) {
-		printf("Failed to join layer diff dir : %s\n", id);
+		LOG_ERROR("Failed to join layer diff dir : %s\n", id);
 		ret = -1;
 		goto out;
 	}
@@ -384,7 +385,7 @@ int overlay2_apply_diff(const char *id, const struct graphdriver *driver, const 
 
 	ret = archive_unpack(content, layer_diff, &options, &err);
 	if(ret != 0) {
-		printf("Failed to unpack to %s : %s\n", layer_diff, err);
+		LOG_ERROR("Failed to unpack to %s : %s\n", layer_diff, err);
 		ret = -1;
 		goto out;
 	}
@@ -400,12 +401,12 @@ int graphdriver_apply_diff(const char *id, const struct io_read_wrapper *content
     int ret = 0;
 
     /*if (g_driver == NULL) {
-        printf("Driver not inited yet\n");
+    	LOG_ERROR("Driver not inited yet\n");
         return -1; 
     }*/  
 
     if (id == NULL || content == NULL) {
-        printf("Invalid input arguments for driver umount layer\n");
+    	LOG_ERROR("Invalid input arguments for driver umount layer\n");
         return -1; 
     }   
 
@@ -428,12 +429,12 @@ static int driver_init_quota(struct graphdriver *driver)
         if (driver->quota_ctrl != NULL) {
             driver->support_quota = true;
         } else if (driver->overlay_opts->default_quota != 0) { 
-            printf("Storage option overlay.size not supported. Filesystem does not support Project Quota\n");
+        	LOG_ERROR("Storage option overlay.size not supported. Filesystem does not support Project Quota\n");
             ret = -1;
             goto out; 
         }
     } else if (driver->overlay_opts->default_quota != 0) { 
-        printf("Storage option overlay.size only supported for backingFS XFS or ext4.\n");
+    	LOG_ERROR("Storage option overlay.size only supported for backingFS XFS or ext4.\n");
         ret = -1;
         goto out; 
     }    
@@ -449,7 +450,7 @@ int graphdriver_init() {
 	struct overlay_options *overlay_opts = NULL;
 	overlay_opts = calloc_s(1, sizeof(struct overlay_options));
 	if(overlay_opts == NULL) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		ret = -1;
 		goto out;
 	}
@@ -463,17 +464,17 @@ int graphdriver_init() {
 	g_driver.home = strdup_s(driver_home);
 	root_dir = path_dir(driver_home);
 	if(root_dir == NULL) {
-		printf("Unable to get overlay root home directory %s.\n", driver_home);
+		LOG_ERROR("Unable to get overlay root home directory %s.\n", driver_home);
 		return -1;
 	}
 	g_driver.backing_fs = get_fs_name(root_dir);
 	if(g_driver.backing_fs == NULL) {
-		printf("Failed to get overlay backing fs\n");
+		LOG_ERROR("Failed to get overlay backing fs\n");
 		ret = -1;
 		goto out;
 	}
 	if(!support_d_type(driver_home)) {
-		printf("The backing %s filesystem is formatted without d_type support, which leads to incorrect behavior\n", driver_home);
+		LOG_ERROR("The backing %s filesystem is formatted without d_type support, which leads to incorrect behavior\n", driver_home);
 		ret = -1;
 		goto out;
 	}
@@ -487,7 +488,7 @@ int graphdriver_init() {
 	}
 
 	if(umount2(driver_home, MNT_DETACH) && errno != EINVAL) {
-		printf("Failed to umount the target : %s\n", driver_home);
+		LOG_ERROR("Failed to umount the target : %s\n", driver_home);
 		ret = -1;
 		goto out;
 	}
@@ -513,7 +514,7 @@ static int append_default_quota_opts(struct driver_create_opts *ori_opts, uint64
 
     nret = snprintf(tmp, sizeof(tmp), "%llu", (unsigned long long)quota);
     if (nret < 0 || (size_t)nret >= sizeof(tmp)) {
-       	printf("Failed to make quota string");
+       	LOG_ERROR("Failed to make quota string");
         ret = -1;
         goto out; 
     }    
@@ -521,7 +522,7 @@ static int append_default_quota_opts(struct driver_create_opts *ori_opts, uint64
     if (ori_opts->storage_opt == NULL) {
         ori_opts->storage_opt = calloc_s(1, sizeof(json_map_string_string));
         if (ori_opts->storage_opt == NULL) {
-            printf("Memory out");
+        	LOG_ERROR("Memory out");
             ret = -1;
             goto out; 
         }
@@ -535,7 +536,7 @@ static int append_default_quota_opts(struct driver_create_opts *ori_opts, uint64
     if (i == ori_opts->storage_opt->len) {
         ret = append_json_map_string_string(ori_opts->storage_opt, "size", tmp);
         if (ret != 0) { 
-            printf("Failed to append quota size option");
+        	LOG_ERROR("Failed to append quota size option");
             ret = -1;
             goto out; 
         }
@@ -552,12 +553,12 @@ static int check_parent_valid(const char *parent, const struct graphdriver *driv
 	if(parent != NULL) {
 		parent_dir = path_join(driver->home, parent);
 		if(parent_dir == NULL) {
-			printf("Failed to join layer dir: %s\n", parent);
+			LOG_ERROR("Failed to join layer dir: %s\n", parent);
 			ret = -1;
 			goto out;
 		}
 		if(!dir_exists(parent_dir)) {
-			printf("parent layer %s not exists\n", parent_dir);
+			LOG_ERROR("parent layer %s not exists\n", parent_dir);
 			ret = -1;
 			goto out;
 		}
@@ -576,21 +577,21 @@ static int set_layer_quota(const char *dir, const json_map_string_string *opts, 
 			int64_t converted = 0;
 			ret = parse_byte_size_string(opts->values[i], &converted);
 			if(ret != 0) {
-				printf("Invalid size '%s' : %s\n", opts->values[i], strerror(-ret));
+				LOG_ERROR("Invalid size '%s' : %s\n", opts->values[i], strerror(-ret));
 				ret = -1;
 				goto out;
 			}
 			quota = (uint64_t)converted;
 			break;
 		} else {
-			printf("Unknown option %s\n", opts->keys[i]);
+			LOG_ERROR("Unknown option %s\n", opts->keys[i]);
 			ret = -1;
 			goto out;
 		}
 	}
 
 	if(quota > 0 && quota < 4096) {
-		printf("Illegal storage quota size %lu, 4096 at least\n", quota);
+		LOG_ERROR("Illegal storage quota size %lu, 4096 at least\n", quota);
 		ret = -1;
 		goto out;
 	}
@@ -615,27 +616,27 @@ static int do_diff_symlink(const char *id, char *link_id, const char *_driver_ho
 
     nret = snprintf(target_path, PATH_MAX, "../%s/diff", id);
     if (nret < 0 || nret >= PATH_MAX) {
-        printf("Failed to get target path %s\n", id);
+    	LOG_ERROR("Failed to get target path %s\n", id);
         ret = -1;
         goto out;
     }
 
     nret = snprintf(link_path, PATH_MAX, "%s/%s/%s", _driver_home, OVERLAY_LINK_DIR, link_id);
     if (nret < 0 || nret >= PATH_MAX) {
-        printf("Failed to get link path %s\n", link_id);
+    	LOG_ERROR("Failed to get link path %s\n", link_id);
         ret = -1;
         goto out;
     }
 
     if (clean_path(link_path, cleaned_path, sizeof(cleaned_path)) == NULL) {
-        printf("failed to get clean path %s\n", link_path);
+    	LOG_ERROR("failed to get clean path %s\n", link_path);
         ret = -1;
         goto out;
     }
 
     nret = symlink(target_path, cleaned_path);
     if (nret < 0) {
-        printf("Failed to create symlink from \"%s\" to \"%s\"\n", cleaned_path, target_path);
+    	LOG_ERROR("Failed to create symlink from \"%s\" to \"%s\"\n", cleaned_path, target_path);
         ret = -1;
         goto out;
     }
@@ -652,28 +653,28 @@ static int mk_diff_symlink(const char *id, const char *layer_dir, const char *_d
 
     ret = generate_random_str(layer_id, MAX_LAYER_ID_LENGTH);
     if (ret != 0) {
-        printf("Failed to get layer symlink id %s\n", id);
+    	LOG_ERROR("Failed to get layer symlink id %s\n", id);
         ret = -1;
         goto out;
     }
 
     ret = do_diff_symlink(id, layer_id, _driver_home);
     if (ret != 0) {
-        printf("Failed to do symlink id %s\n", id);
+    	LOG_ERROR("Failed to do symlink id %s\n", id);
         ret = -1;
         goto out;
     }
 
     link_file = path_join(layer_dir, OVERLAY_LAYER_LINK);
     if (link_file == NULL) {
-        printf("Failed to get layer link file %s\n", layer_dir);
+    	LOG_ERROR("Failed to get layer link file %s\n", layer_dir);
         ret = -1;
         goto out;
     }
 
     ret = write_file(link_file, layer_id, strlen(layer_id), 0666);
     if (ret) {
-        printf("Failed to write %s\n", link_file);
+    	LOG_ERROR("Failed to write %s\n", link_file);
         ret = -1;
         goto out;
     }
@@ -689,13 +690,13 @@ static int mk_diff_directory(const char *layer_dir) {
 
 	diff_dir = path_join(layer_dir, OVERLAY_LAYER_DIFF);
 	if(diff_dir == NULL) {
-		printf("Failed to join layer diff dir : %s\n", layer_dir);
+		LOG_ERROR("Failed to join layer diff dir : %s\n", layer_dir);
 		ret = -1;
 		goto out;
 	}
 
 	if(mkdir_p(diff_dir, 0644) != 0) {
-		printf("Unable to create layer diff directory %s\n", diff_dir);
+		LOG_ERROR("Unable to create layer diff directory %s\n", diff_dir);
 		ret = -1;
 		goto out;
 	}
@@ -711,13 +712,13 @@ static int mk_work_directory(const char *layer_dir) {
 
 	work_dir = path_join(layer_dir, OVERLAY_LAYER_WORK);
 	if(work_dir == NULL) {
-		printf("Failed to join layer diff dir : %s\n", layer_dir);
+		LOG_ERROR("Failed to join layer diff dir : %s\n", layer_dir);
 		ret = -1;
 		goto out;
 	}
 
 	if(mkdir_p(work_dir, 0644) != 0) {
-		printf("Unable to create layer work directory %s\n", work_dir);
+		LOG_ERROR("Unable to create layer work directory %s\n", work_dir);
 		ret = -1;
 		goto out;
 	}
@@ -733,13 +734,13 @@ static int mk_merged_directory(const char *layer_dir) {
 
 	merged_dir = path_join(layer_dir, OVERLAY_LAYER_MERGED);
 	if(merged_dir == NULL) {
-		printf("Failed to join layer diff dir : %s\n", layer_dir);
+		LOG_ERROR("Failed to join layer diff dir : %s\n", layer_dir);
 		ret = -1;
 		goto out;
 	}
 
 	if(mkdir_p(merged_dir, 0644) != 0) {
-		printf("Unable to create layer merged directory %s\n", merged_dir);
+		LOG_ERROR("Unable to create layer merged directory %s\n", merged_dir);
 		ret = -1;
 		goto out;
 	}
@@ -755,13 +756,13 @@ static int mk_empty_directory(const char *layer_dir) {
 
 	empty_dir = path_join(layer_dir, OVERLAY_LAYER_EMPTY);
 	if(empty_dir == NULL) {
-		printf("Failed to join layer diff dir : %s\n", layer_dir);
+		LOG_ERROR("Failed to join layer diff dir : %s\n", layer_dir);
 		ret = -1;
 		goto out;
 	}
 
 	if(mkdir_p(empty_dir, 0766) != 0) {
-		printf("Unable to create layer empty directory %s\n", empty_dir);
+		LOG_ERROR("Unable to create layer empty directory %s\n", empty_dir);
 		ret = -1;
 		goto out;
 	}
@@ -784,24 +785,24 @@ static char *get_lower(const char *parent, const char *_driver_home)
 
     parent_dir = path_join(_driver_home, parent);
     if (parent_dir == NULL) {
-        printf("Failed to get parent dir %s\n", parent);
+    	LOG_ERROR("Failed to get parent dir %s\n", parent);
         goto out;
     }
 
     parent_link_file = path_join(parent_dir, OVERLAY_LAYER_LINK);
     if (parent_link_file == NULL) {
-        printf("Failed to get parent link %s\n", parent_dir);
+    	LOG_ERROR("Failed to get parent link %s\n", parent_dir);
         goto out;
     }
 
     parent_link = read_text_file(parent_link_file);
     if (parent_link == NULL) {
-        printf("Failed to read parent link %s\n", parent_link_file);
+    	LOG_ERROR("Failed to read parent link %s\n", parent_link_file);
         goto out;
     }
 
     if (strlen(parent_link) >= (INT_MAX - strlen(OVERLAY_LINK_DIR) - 2)) {
-        printf("parent link %s too large\n", parent_link_file);
+    	LOG_ERROR("parent link %s too large\n", parent_link_file);
         goto out;
     }
 
@@ -809,14 +810,14 @@ static char *get_lower(const char *parent, const char *_driver_home)
 
     parent_lower_file = path_join(parent_dir, OVERLAY_LAYER_LOWER);
     if (parent_lower_file == NULL) {
-        printf("Failed to get parent lower %s\n", parent_dir);
+    	LOG_ERROR("Failed to get parent lower %s\n", parent_dir);
         goto out;
     }
 
     parent_lowers = read_text_file(parent_lower_file);
     if (parent_lowers != NULL) {
         if (strlen(parent_lowers) >= (INT_MAX - lower_len - 1)) {
-            printf("parent lower %s too large\n", parent_link_file);
+        	LOG_ERROR("parent lower %s too large\n", parent_link_file);
             goto out;
         }
         lower_len = lower_len + strlen(parent_lowers) + 1;
@@ -824,7 +825,7 @@ static char *get_lower(const char *parent, const char *_driver_home)
 
     lower = calloc_s(1, lower_len);
     if (lower == NULL) {
-        printf("Memory out\n");
+    	LOG_ERROR("Memory out\n");
         goto err_out;
     }
 
@@ -834,7 +835,7 @@ static char *get_lower(const char *parent, const char *_driver_home)
         nret = snprintf(lower, lower_len, "%s/%s", OVERLAY_LINK_DIR, parent_link);
     }
     if (nret < 0 || nret >= lower_len) {
-        printf("lower %s too large\n", parent_link);
+    	LOG_ERROR("lower %s too large\n", parent_link);
         goto err_out;
     }
 
@@ -864,14 +865,14 @@ static int write_lowers(const char *layer_dir, const char *lowers)
 
     lowers_file = path_join(layer_dir, OVERLAY_LAYER_LOWER);
     if (lowers_file == NULL) {
-        printf("Failed to get layer lower file %s\n", layer_dir);
+    	LOG_ERROR("Failed to get layer lower file %s\n", layer_dir);
         ret = -1;
         goto out;
     }
 
     ret = write_file(lowers_file, lowers, strlen(lowers), 0666);
     if (ret) {
-        printf("Failed to write %s\n", lowers_file);
+    	LOG_ERROR("Failed to write %s\n", lowers_file);
         ret = -1;
         goto out;
     }
@@ -934,7 +935,7 @@ static int do_create(const char *id, const char *parent, const struct graphdrive
 
 	layer_dir = path_join(driver->home, id);
 	if(layer_dir == NULL) {
-		printf("Failed to join layer dir: %s\n", id);
+		LOG_ERROR("Failed to join layer dir: %s\n", id);
 		ret = -1;
 		goto out;
 	}
@@ -945,14 +946,14 @@ static int do_create(const char *id, const char *parent, const struct graphdrive
 	}
 
 	if(mkdir_p(layer_dir, 0777) != 0) {
-		printf("Unable to create layer directory %s.\n", layer_dir);
+		LOG_ERROR("Unable to create layer directory %s.\n", layer_dir);
 		ret = -1;
 		goto out;
 	}
 
 	if(create_opts->storage_opt != NULL && create_opts->storage_opt->len != 0) {
 		if(set_layer_quota(layer_dir, create_opts->storage_opt, driver) != 0) {
-			printf("Unable to set layer quota %s\n", layer_dir);
+			LOG_ERROR("Unable to set layer quota %s\n", layer_dir);
 			ret = -1;
 			goto err_out;
 		}
@@ -967,7 +968,7 @@ static int do_create(const char *id, const char *parent, const struct graphdrive
 
 err_out:
 	if(recursive_rmdir(layer_dir, 0)) {
-		printf("Failed to delete layer path: %s\n", layer_dir);
+		LOG_ERROR("Failed to delete layer path: %s\n", layer_dir);
 	}
 out:
 	free(layer_dir);
@@ -978,12 +979,12 @@ int graphdriver_create_rw(const char *id, const char *parent, struct driver_crea
 	int ret = 0;
 
 	if(id == NULL || create_opts == NULL) {
-		printf("Invalid input arguments for driver create!\n");
+		LOG_ERROR("Invalid input arguments for driver create!\n");
 		return -1;
 	}
 	
 	if(create_opts->storage_opt != NULL && create_opts->storage_opt->len != 0 && !g_driver.support_quota) {
-		printf("--storage-opt is support only for overlay over xfs or ext4\n");
+		LOG_ERROR("--storage-opt is support only for overlay over xfs or ext4\n");
 		ret = -1;
 		goto out;
 	}
@@ -1002,12 +1003,12 @@ int graphdriver_create_ro(const char *id, const char *parent, const struct drive
 	int ret = 0;
 
 	if(id == NULL || create_opts == NULL) {
-		printf("Invalid input arguments for driver create\n");
+		LOG_ERROR("Invalid input arguments for driver create\n");
 		return -1;
 	}
 
 	if(create_opts->storage_opt != NULL && create_opts->storage_opt->len != 0) {
-		printf("--storage-opt size is only supported for ReadWrite Layers\n");
+		LOG_ERROR("--storage-opt size is only supported for ReadWrite Layers\n");
 		return -1;
 	}
 	
@@ -1022,12 +1023,12 @@ static int append_abs_empty_path(const char *layer_dir, char ***abs_lowers)
 
     abs_path = path_join(layer_dir, OVERLAY_LAYER_EMPTY);
     if (!dir_exists(abs_path)) {
-        printf("Can't stat absolute layer:%s\n", abs_path);
+    	LOG_ERROR("Can't stat absolute layer:%s\n", abs_path);
         ret = -1;
         goto out;
     }
     if (array_append(abs_lowers, abs_path) != 0) {
-        printf("Can't append absolute layer:%s\n", abs_path);
+    	LOG_ERROR("Can't append absolute layer:%s\n", abs_path);
         ret = -1;
         goto out;
     }
@@ -1045,7 +1046,7 @@ static int append_rel_empty_path(const char *id, char ***rel_lowers)
     rel_path = string_append("/empty", id);
 
     if (array_append(rel_lowers, rel_path) != 0) {
-        printf("Can't append relative layer:%s\n", rel_path);
+    	LOG_ERROR("Can't append relative layer:%s\n", rel_path);
         ret = -1;
         goto out;
     }
@@ -1078,7 +1079,7 @@ static int get_mount_opt_lower_dir(const char *id, const char *layer_dir, const 
         }
 
         if (array_append(&rel_lowers, lowers[i]) != 0) {
-            printf("Can't append relative layer:%s\n", lowers[i]);
+        	LOG_ERROR("Can't append relative layer:%s\n", lowers[i]);
             ret = -1;
             goto out;
         }
@@ -1097,7 +1098,7 @@ static int get_mount_opt_lower_dir(const char *id, const char *layer_dir, const 
     *abs_lower_dir = string_join(":", (const char **)abs_lowers, array_len((const char **)abs_lowers));
     *rel_lower_dir = string_join(":", (const char **)rel_lowers, array_len((const char **)rel_lowers));
     if ((*abs_lower_dir) == NULL || (*rel_lower_dir) == NULL) {
-        printf("memory out\n");
+    	LOG_ERROR("memory out\n");
         free(*abs_lower_dir);
         *abs_lower_dir = NULL;
         free(*rel_lower_dir);
@@ -1124,25 +1125,25 @@ static char *get_mount_opt_data_with_custom_option(size_t cur_size, const char *
 
     custom_opts = string_join(",", (const char **)(mount_opts->options), mount_opts->options_len);
     if (custom_opts == NULL) {
-        printf("Failed to get custom mount opts\n");
+    	LOG_ERROR("Failed to get custom mount opts\n");
         goto error_out;
     }
 
     if (strlen(custom_opts) >= (INT_MAX - cur_size - 1)) {
-        printf("custom mount option too large\n");
+    	LOG_ERROR("custom mount option too large\n");
         goto error_out;
     }
 
     data_size = cur_size + strlen(custom_opts) + 1;
     mount_data = common_calloc_s(data_size);
     if (mount_data == NULL) {
-        printf("Memory out\n");
+    	LOG_ERROR("Memory out\n");
         goto error_out;
     }
 
     nret = snprintf(mount_data, data_size, "%s,%s", custom_opts, cur_opts);
     if (nret < 0 || (size_t)nret >= data_size) {
-        printf("Failed to get custom opts data\n");
+    	LOG_ERROR("Failed to get custom opts data\n");
         goto error_out;
     }
 
@@ -1164,20 +1165,20 @@ static char *get_mount_opt_data_with_driver_option(size_t cur_size, const char *
     size_t data_size = 0;
 
     if (strlen(mount_opts) >= (INT_MAX - cur_size - 1)) {
-        printf("driver mount option too large\n");
+    	LOG_ERROR("driver mount option too large\n");
         goto error_out;
     }
 
     data_size = cur_size + strlen(mount_opts) + 1;
     mount_data = common_calloc_s(data_size);
     if (mount_data == NULL) {
-        printf("Memory out\n");
+    	LOG_ERROR("Memory out\n");
         goto error_out;
     }
 
     nret = snprintf(mount_data, data_size, "%s,%s", mount_opts, cur_opts);
     if (nret < 0 || (size_t)nret >= data_size) {
-        printf("Failed to get driver opts data\n");
+    	LOG_ERROR("Failed to get driver opts data\n");
         goto error_out;
     }
 
@@ -1203,19 +1204,19 @@ static char *get_abs_mount_opt_data(const char *layer_dir, const char *abs_lower
 
     upper_dir = path_join(layer_dir, OVERLAY_LAYER_DIFF);
     if (upper_dir == NULL) {
-        printf("Failed to join layer diff dir:%s\n", layer_dir);
+    	LOG_ERROR("Failed to join layer diff dir:%s\n", layer_dir);
         goto error_out;
     }    
 
     work_dir = path_join(layer_dir, OVERLAY_LAYER_WORK);
     if (work_dir == NULL) {
-        printf("Failed to join layer work dir:%s\n", layer_dir);
+    	LOG_ERROR("Failed to join layer work dir:%s\n", layer_dir);
         goto error_out;
     }    
 
     if (strlen(abs_lower_dir) >= (INT_MAX - strlen("lowerdir=") - strlen(",upperdir=") - strlen(upper_dir) -
                                   strlen(",workdir=") - strlen(work_dir) - 1)) {
-        printf("abs lower dir too large\n");
+    	LOG_ERROR("abs lower dir too large\n");
         goto error_out;
     }    
     data_size = strlen("lowerdir=") + strlen(abs_lower_dir) + strlen(",upperdir=") + strlen(upper_dir) +
@@ -1223,13 +1224,13 @@ static char *get_abs_mount_opt_data(const char *layer_dir, const char *abs_lower
 
     mount_data = common_calloc_s(data_size);
     if (mount_data == NULL) {
-        printf("Memory out\n");
+    	LOG_ERROR("Memory out\n");
         goto error_out;
     }    
 
     nret = snprintf(mount_data, data_size, "lowerdir=%s,upperdir=%s,workdir=%s", abs_lower_dir, upper_dir, work_dir);
     if (nret < 0 || (size_t)nret >= data_size) {
-        printf("abs lower dir too large\n");
+    	LOG_ERROR("abs lower dir too large\n");
         goto error_out;
     }    
 
@@ -1286,13 +1287,13 @@ static char *generate_mount_opt_data(const char *id, const char *layer_dir, cons
 
     ret = get_mount_opt_lower_dir(id, layer_dir, driver->home, &abs_lower_dir, &rel_lower_dir);
     if (ret != 0) {
-        printf("Failed to get mount opt lower dir\n");
+    	LOG_ERROR("Failed to get mount opt lower dir\n");
         goto out;
     }
 
     mount_data = get_abs_mount_opt_data(layer_dir, abs_lower_dir, driver, mount_opts);
     if (mount_data == NULL) {
-        printf("Failed to get abs mount opt data");
+    	LOG_ERROR("Failed to get abs mount opt data");
         goto out;
     }
     /*if (strlen(mount_data) > page_size) {
@@ -1323,7 +1324,7 @@ static int abs_mount(const char *layer_dir, const char *merged_dir, const char *
 
     ret = util_mount("overlay", merged_dir, "overlay", 0, mount_data);
     if (ret != 0) {
-        printf("Failed to mount %s with option \"%s\"\n", merged_dir, mount_data);
+    	LOG_ERROR("Failed to mount %s with option \"%s\"\n", merged_dir, mount_data);
         goto out;
     }
 
@@ -1338,7 +1339,7 @@ out:
 
     mount_target = string_append("/merged", id);
     if (mount_target == NULL) {
-        printf("Failed to join layer merged dir:%s\n", id);
+    	LOG_ERROR("Failed to join layer merged dir:%s\n", id);
         ret = -1;
         goto out;
     }
@@ -1364,24 +1365,24 @@ static char *do_mount_layer(const char *id, const char *layer_dir, const struct 
     
 	mount_data = generate_mount_opt_data(id, layer_dir, driver, mount_opts, &use_rel_mount);
     if (mount_data == NULL) {
-        printf("Failed to get mount data\n");
+    	LOG_ERROR("Failed to get mount data\n");
         goto error_out;
     }
 
     merged_dir = path_join(layer_dir, OVERLAY_LAYER_MERGED);
     if (merged_dir == NULL) {
-        printf("Failed to join layer merged dir:%s\n", layer_dir);
+    	LOG_ERROR("Failed to join layer merged dir:%s\n", layer_dir);
         goto error_out;
     }
 
     if (!use_rel_mount) {
         if (abs_mount(layer_dir, merged_dir, mount_data) != 0) {
-            printf("Failed to mount %s with option \"%s\"\n", merged_dir, mount_data);
+        	LOG_ERROR("Failed to mount %s with option \"%s\"\n", merged_dir, mount_data);
             goto error_out;
         }
     } else {
         /*if (rel_mount(driver->home, id, mount_data) != 0) {
-            printf("Failed to mount %s from %s with option \"%s\"\n", id, driver->home, mount_data);
+        	LOG_ERROR("Failed to mount %s from %s with option \"%s\"\n", id, driver->home, mount_data);
             goto error_out;
         }*/
     }
@@ -1403,22 +1404,22 @@ char *overlay2_mount_layer(const char *id, const struct graphdriver *driver, con
     char *layer_dir = NULL;
 
     if (id == NULL || driver == NULL) {
-        printf("Invalid input arguments");
+    	LOG_ERROR("Invalid input arguments");
         return NULL;
     }    
     layer_dir = path_join(driver->home, id); 
     if (layer_dir == NULL) {
-        printf("Failed to join layer dir:%s\n", id); 
+    	LOG_ERROR("Failed to join layer dir:%s\n", id); 
         goto out; 
     }    
     if (!dir_exists(layer_dir)) {
-        printf("layer dir %s not exist\n", layer_dir);
+    	LOG_ERROR("layer dir %s not exist\n", layer_dir);
         goto out; 
     }    
 
     merged_dir = do_mount_layer(id, layer_dir, driver, mount_opts);
     if (merged_dir == NULL) {
-        printf("Failed to mount layer %s\n", id); 
+    	LOG_ERROR("Failed to mount layer %s\n", id); 
         goto out; 
     }    
 out:
@@ -1431,7 +1432,7 @@ char *graphdriver_mount_layer(const char *id, const struct driver_mount_opts *mo
     char *result = NULL;
 
     if (id == NULL) {
-        printf("Invalid input arguments for driver mount layer\n");
+    	LOG_ERROR("Invalid input arguments for driver mount layer\n");
         return NULL;
     }
 
@@ -1447,31 +1448,31 @@ int overlay2_umount_layer(const char *id, const struct graphdriver *driver) {
 	char *layer_dir = NULL;
 
 	if(id == NULL || driver == NULL) {
-		printf("Invalid input arguments\n");
+		LOG_ERROR("Invalid input arguments\n");
 		return -1;
 	}
 
 	layer_dir = path_join(driver->home, id);
 	if(layer_dir == NULL) {
-		printf("Failed to join layer dir : %s\n", id);
+		LOG_ERROR("Failed to join layer dir : %s\n", id);
 		ret = -1;
 		goto out;
 	}
 	
 	if(!dir_exists(layer_dir)) {
-		printf("layer dir %s not exist\n", layer_dir);
+		LOG_ERROR("layer dir %s not exist\n", layer_dir);
 		goto out;
 	}
 	
 	merged_dir = path_join(layer_dir, OVERLAY_LAYER_MERGED);
 	if(merged_dir == NULL) {
-		printf("Failed to join layer merged dir : %s\n", layer_dir);
+		LOG_ERROR("Failed to join layer merged dir : %s\n", layer_dir);
 		ret = -1;
 		goto out;
 	}
 	
 	if(umount2(merged_dir, MNT_DETACH) && errno != EINVAL) {
-		printf("Failed to umount the target : %s\n", merged_dir);
+		LOG_ERROR("Failed to umount the target : %s\n", merged_dir);
 	}
 out:
 	free(layer_dir);
@@ -1484,7 +1485,7 @@ int graphdriver_umount_layer(const char *id)
     int ret = 0;
 
     if (id == NULL) {
-        printf("Invalid input arguments for driver mount layer\n");
+    	LOG_ERROR("Invalid input arguments for driver mount layer\n");
         return 0;
     }
 
@@ -1504,7 +1505,6 @@ void free_graphdriver_mount_opts(struct driver_mount_opts *opts) {
 
 int overlay2_rm_layer(const char *id, const struct graphdriver *driver)
 {
-	printf("================overlay2_rm_layer===================\n");
     int ret = 0;
     int nret = 0;
     char *layer_dir = NULL;
@@ -1513,19 +1513,18 @@ int overlay2_rm_layer(const char *id, const struct graphdriver *driver)
     char clean_path[PATH_MAX] = { 0 };
 
     if (id == NULL || driver == NULL) {
-        printf("Invalid input arguments");
+    	LOG_ERROR("Invalid input arguments");
         return -1;
     }
 
     layer_dir = path_join(driver->home, id);
     if (layer_dir == NULL) {
-        printf("Failed to join layer dir:%s", id);
+    	LOG_ERROR("Failed to join layer dir:%s", id);
         ret = -1;
         goto out;
     }
-	printf("%s\n", layer_dir);
 	if (recursive_rmdir(layer_dir, 0) != 0) {
-        printf("Failed to remove layer directory %s", layer_dir);
+    	LOG_ERROR("Failed to remove layer directory %s", layer_dir);
         ret = -1;
         goto out;
     }
@@ -1533,7 +1532,6 @@ int overlay2_rm_layer(const char *id, const struct graphdriver *driver)
 out:
 	free(layer_dir);
 	free(link_id);
-	printf("****************overlay2_rm_layer*********************\n");
 	return ret;
 }
 
@@ -1541,7 +1539,7 @@ int graphdriver_rm_layer(const char *id) {
 	int ret = 0;
 
 	if(id == NULL) {
-		printf("Invalid input arguments for driver remove layer\n");
+		LOG_ERROR("Invalid input arguments for driver remove layer\n");
 		return -1;
 	}
 

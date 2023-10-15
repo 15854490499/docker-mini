@@ -5,6 +5,7 @@
 #include "utils.h"
 #include "image_api.h"
 #include "container_api.h"
+#include "log.h"
 
 typedef int proc_status;
 
@@ -15,7 +16,7 @@ docker::ImageManager::ImageManager() {
 	int ret = 0;
 	ret = oci_init();
 	if(ret != 0) {
-		printf("oci init err\n");
+		LOG_ERROR("oci init err\n");
 		exit(1);
 	}
 }
@@ -28,7 +29,7 @@ std::string docker::ImageManager::PullImage(const std::string image) {
 	
 	request = (im_pull_request*)common_calloc_s(sizeof(im_pull_request));
 	if(request == nullptr) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		goto cleanup;
 	}
 	request->type = strdup_s(IMAGE_TYPE_OCI);
@@ -37,9 +38,9 @@ std::string docker::ImageManager::PullImage(const std::string image) {
 	ret = im_pull_image(request, &response);
 	if(ret != 0) {
 		if(response != nullptr && response->errmsg != nullptr) {
-			printf("%s\n", response->errmsg);
+			LOG_ERROR("%s\n", response->errmsg);
 		} else {
-			printf("Failed to call pull image\n");
+			LOG_ERROR("Failed to call pull image\n");
 		}
 		goto cleanup;
 	}
@@ -59,7 +60,7 @@ void docker::ImageManager::RemoveImage(const std::string image) {
 	
 	request = (im_rmi_request*)common_calloc_s(sizeof(im_rmi_request));
 	if(request == nullptr) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		goto cleanup;
 	}
 	request->image = strdup_s(image.c_str());
@@ -67,7 +68,7 @@ void docker::ImageManager::RemoveImage(const std::string image) {
 
 	ret = im_rm_image(request, &response);
 	if(ret != 0) {
-		printf("%s\n", response->errmsg);
+		LOG_ERROR("%s\n", response->errmsg);
 		goto cleanup;
 	}
 
@@ -82,7 +83,7 @@ docker::container::container(/*container_config &config*/) {
 	int ret = 0;
 	ret = oci_init();
 	if(ret != 0) {
-		printf("oci init err\n");
+		LOG_ERROR("oci init err\n");
 		exit(1);
 	}
 }
@@ -111,31 +112,31 @@ void docker::container::start_container() {
 	veth1 = lxc_mkifname(veth1buf);
 	veth2 = lxc_mkifname(veth2buf);
 	if(veth1 == NULL || veth2 == NULL) {
-		printf("can not create ifname\n");
+		LOG_ERROR("can not create ifname\n");
 		return;
 	}
 
 	ret = lxc_veth_create(veth1, veth2);
 	if(ret != 0) {
-		printf("create veth pair err\n");
+		LOG_ERROR("create veth pair err\n");
 		goto out;
 	}
 
 	ret = setup_private_host_hw_addr(veth1);
 	if(ret != 0) {
-		printf("setup private host hardware addr err\n");
+		LOG_ERROR("setup private host hardware addr err\n");
 		goto out;
 	}
 	
 	ret = lxc_bridge_attach(config.bridge_name.c_str(), veth1);
 	if(ret != 0) {
-		printf("attach veth1 to bridge err\n");
+		LOG_ERROR("attach veth1 to bridge err\n");
 		goto out;
 	}
 
 	ret = lxc_netdev_up(veth1);
 	if(ret != 0) {
-		printf("setup veth1 err\n");
+		LOG_ERROR("setup veth1 err\n");
 		goto out;
 	}
 
@@ -151,7 +152,7 @@ void docker::container::start_container() {
 	};
 
 	if((m_sem = sem_open("/docker-mini", O_CREAT | O_RDWR, 0666, 0)) == SEM_FAILED) {
-		printf("sem_open err\n");
+		LOG_ERROR("sem_open err\n");
 		goto out;
 	}
 
@@ -232,7 +233,7 @@ void docker::container::create(const std::string container_id, const std::string
 	ret = container_create(request, &response);
 
 	if(response->errmsg != NULL) {
-		printf("%s\n", response->errmsg);		
+		LOG_ERROR("%s\n", response->errmsg);		
 	}
 	
 	free_container_create_request(request);
@@ -251,7 +252,7 @@ void docker::container::remove(const std::string container_id) {
 	ret = container_delete(request, &response);
 
 	if(response->errmsg != NULL) {
-		printf("%s\n", response->errmsg);
+		LOG_ERROR("%s\n", response->errmsg);
 	}
 
 	free_container_delete_request(request);

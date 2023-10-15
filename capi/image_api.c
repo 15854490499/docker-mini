@@ -4,25 +4,26 @@
 #include "layer.h"
 #include "rootfs.h"
 #include "utils.h"
+#include "log.h"
 
 int oci_init() {
 	int ret = 0;
 	
 	ret = image_store_init();
 	if(ret != 0) {
-		printf("image store init err\n");
+		LOG_ERROR("image store init err\n");
 		ret = -1;
 		goto out;
 	}
 	ret = layer_store_init();
 	if(ret != 0) {
-		printf("layer store init err\n");
+		LOG_ERROR("layer store init err\n");
 		ret = -1;
 		goto out;
 	}
 	ret = rootfs_store_init();
 	if(ret != 0) {
-		printf("rootfs store init err\n");
+		LOG_ERROR("rootfs store init err\n");
 		ret = -1;
 		goto out;
 	}
@@ -33,12 +34,12 @@ out:
 
 static bool check_im_pull_args(const im_pull_request *request, im_pull_response* const *response) {
 	if(request == NULL || response == NULL) {
-		printf("Request or response is NULL\n");
+		LOG_ERROR("Request or response is NULL\n");
 		return false;
 	}
 
 	if(request->image == NULL) {
-		printf("Empty image required\n");
+		LOG_ERROR("Empty image required\n");
 		return false;
 	}
 	return true;
@@ -52,7 +53,7 @@ static int pull_image(const im_pull_request *request, char **name) {
 	
 	options = (registry_pull_options*)common_calloc_s(sizeof(registry_pull_options));
 	if(options == NULL) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		goto out;
 	}
 
@@ -70,7 +71,7 @@ static int pull_image(const im_pull_request *request, char **name) {
 	options->image_name = oci_add_host(host, with_tag);
 	ret = registry_pull(options);
 	if(ret != 0) {
-		printf("registry pull failed\n");
+		LOG_ERROR("registry pull failed\n");
 		goto out;
 	}
 
@@ -89,20 +90,20 @@ static int oci_do_pull_image(const im_pull_request *request, im_pull_response *r
 	char *dest_image_name = NULL;
 
 	if(request == NULL || request->image == NULL || response == NULL) {
-		printf("Invalid NULL param\n");
+		LOG_ERROR("Invalid NULL param\n");
 		return -1;
 	}
 	
 	ret = pull_image(request, &dest_image_name);
 	if(ret != 0) {
-		printf("pull image %s failed\n", request->image);
+		LOG_ERROR("pull image %s failed\n", request->image);
 		ret = -1;
 		goto out;
 	}
 
 	image = storage_img_get_summary(dest_image_name);
 	if(image == NULL) {
-		printf("get image %s failed after pulling\n", dest_image_name);
+		LOG_ERROR("get image %s failed after pulling\n", dest_image_name);
 		ret = -1;
 		goto out;
 	}
@@ -121,14 +122,14 @@ static int oci_prepare_rf(const im_prepare_request *request, char **real_rootfs)
 	char *mount_point = NULL;
 
 	if(request == NULL) {
-		printf("request is NULL\n");
+		LOG_ERROR("request is NULL\n");
 		return -1;
 	}
 
 	id = strdup_s(request->container_id);
 	ret = storage_rootfs_create(id, request->image_name, request->mount_label, NULL, real_rootfs);
 	if(ret != 0) {
-		printf("Failed to create container rootfs:%s\n", request->container_id);
+		LOG_ERROR("Failed to create container rootfs:%s\n", request->container_id);
 		ret = -1;
 		goto out;
 	}
@@ -153,7 +154,7 @@ out:
 
 static int oci_delete_rf(const im_delete_rootfs_request *request) {
 	if(request == NULL) {
-		printf("Request is NULL\n");
+		LOG_ERROR("Request is NULL\n");
 		return -1;
 	}
 
@@ -183,32 +184,32 @@ static int oci_rm_image(const im_rmi_request *request) {
 	size_t i;
 
 	if(request == NULL || request->image == NULL) {
-		printf("Invalid input arguments\n");
+		LOG_ERROR("Invalid input arguments\n");
 		return -1;
 	}
 
 	if(!valid_image_name(request->image)) {
-		printf("Invalid image name: %s\n", request->image);
+		LOG_ERROR("Invalid image name: %s\n", request->image);
 		ret = -1;
 		goto out;
 	}
 
 	real_image_name = oci_resolve_image_name(request->image);
 	if(real_image_name == NULL) {
-		printf("Failed to resolve image name\n");
+		LOG_ERROR("Failed to resolve image name\n");
 		ret = -1;
 		goto out;
 	}
 
 	if(storage_img_get_names(real_image_name, &image_names, &image_names_len) != 0) {
-		printf("Get image %s names failed\n", real_image_name);
+		LOG_ERROR("Get image %s names failed\n", real_image_name);
 		ret = -1;
 		goto out;
 	}
 
 	image_id = storage_img_get_image_id(real_image_name);
 	if(image_id == NULL) {
-		printf("Get id of image %s failed\n", real_image_name);
+		LOG_ERROR("Get id of image %s failed\n", real_image_name);
 		ret = -1;
 		goto out;
 	}
@@ -216,14 +217,14 @@ static int oci_rm_image(const im_rmi_request *request) {
 	if(image_names_len == 1 || has_prefix(image_id, real_image_name)) {
 		ret = storage_img_delete(real_image_name, true);
 		if(ret != 0) {
-			printf("Failed to remove image %s\n", real_image_name);
+			LOG_ERROR("Failed to remove image %s\n", real_image_name);
 		}
 		goto out;
 	}
 
 	reduced_image_names = (char**)calloc_s(sizeof(char*), image_names_len - 1);
 	if(reduced_image_names == NULL) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		ret = -1;
 		goto out;
 	}
@@ -232,7 +233,7 @@ static int oci_rm_image(const im_rmi_request *request) {
 		if(strcmp(image_names[i], real_image_name) != 0) {
 			reduced_image_names[reduced_image_names_len] = strdup_s(image_names[i]);
 			if(reduced_image_names[reduced_image_names_len] == NULL) {
-				printf("Out of memory\n");
+				LOG_ERROR("Out of memory\n");
 				ret = -1;
 				goto out;
 			}
@@ -242,7 +243,7 @@ static int oci_rm_image(const im_rmi_request *request) {
 
 	ret = storage_img_set_names(real_image_name, (const char**)reduced_image_names, reduced_image_names_len);
 	if(ret != 0) {
-		printf("Failed to set names of image %s\n", real_image_name);
+		LOG_ERROR("Failed to set names of image %s\n", real_image_name);
 		goto out;
 	}
 
@@ -264,13 +265,13 @@ int im_pull_image(const im_pull_request *request, im_pull_response **response) {
 
 	tmp_res = (im_pull_response *)common_calloc_s(sizeof(im_pull_response));
 	if(tmp_res == NULL) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		goto out;
 	}
 	
 	ret = oci_do_pull_image(request, tmp_res);
 	if(ret != 0) {
-		printf("Pull image %s failed\n", request->image);
+		LOG_ERROR("Pull image %s failed\n", request->image);
 		ret = -1;
 		goto out;
 	}
@@ -287,25 +288,25 @@ int im_prepare_container_rootfs(const im_prepare_request *request, char **real_r
 	int nret = 0;
 	
 	if(request == NULL) {
-		printf("Invalid input arguments\n");
+		LOG_ERROR("Invalid input arguments\n");
 		return -1;
 	}
 	
 	if(request->container_id == NULL) {
-		printf("Contaienr prepare need container id\n");
+		LOG_ERROR("Contaienr prepare need container id\n");
 		ret = -1;
 		goto out;
 	}
 
 	if(request->image_type == NULL) {
-		printf("Missing image type\n");
+		LOG_ERROR("Missing image type\n");
 		ret = -1;
 		goto out;
 	}
 
 	nret = oci_prepare_rf(request, real_rootfs);
 	if(nret != 0) {
-		printf("Failed to prepare container rootfs %s with image %s type %s\n", request->container_id, request->image_name, request->image_type);
+		LOG_ERROR("Failed to prepare container rootfs %s with image %s type %s\n", request->container_id, request->image_name, request->image_type);
 		ret = -1;
 		goto out;
 	}
@@ -319,14 +320,14 @@ int im_remove_container_rootfs(const char *container_id) {
 	im_delete_rootfs_request *request = NULL;
 
 	if(container_id == NULL) {
-		printf("Invalid input arguments\n");
+		LOG_ERROR("Invalid input arguments\n");
 		ret = -1;
 		goto out;
 	}
 
 	request = common_calloc_s(sizeof(im_delete_rootfs_request));
 	if(request == NULL) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		ret = -1;
 		goto out;
 	}
@@ -334,7 +335,7 @@ int im_remove_container_rootfs(const char *container_id) {
 	request->name_id = strdup_s(container_id);
 	ret = oci_delete_rf(request);
 	if(ret != 0) {
-		printf("Failed to delete rootfs for container %s\n", container_id);
+		LOG_ERROR("Failed to delete rootfs for container %s\n", container_id);
 		ret = -1;
 		goto out;
 	}
@@ -349,18 +350,18 @@ int im_rm_image(const im_rmi_request *request, im_remove_response **response) {
 	char *image_ref = NULL;
 	
 	if(request == NULL || response == NULL) {
-		printf("Invalid input arguments\n");
+		LOG_ERROR("Invalid input arguments\n");
 		return -1;
 	}
 
 	*response = common_calloc_s(sizeof(im_remove_response));
 	if(*response == NULL) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		return -1;
 	}
 
 	if(request->image == NULL) {
-		printf("remove image requires image ref\n");
+		LOG_ERROR("remove image requires image ref\n");
 		goto pack_response;
 	}
 
@@ -368,7 +369,7 @@ int im_rm_image(const im_rmi_request *request, im_remove_response **response) {
 
 	ret = oci_rm_image(request);
 	if(ret != 0) {
-		printf("Failed to remove image %s\n", image_ref);
+		LOG_ERROR("Failed to remove image %s\n", image_ref);
 		ret = -1;
 		goto pack_response;
 	}

@@ -6,6 +6,7 @@
 #include "storage.h"
 #include "container_api.h"
 #include "image_api.h"
+#include "log.h"
 
 #define CONTAINER_ID_MAX_LEN 64
 static char *try_generate_id()
@@ -17,13 +18,13 @@ static char *try_generate_id()
 
     id = common_calloc_s((CONTAINER_ID_MAX_LEN + 1)); 
     if (id == NULL) {
-        printf("Out of memory\n");
+    	LOG_ERROR("Out of memory\n");
         return NULL;
     }    
 
     for (i = 0; i < max_time; i++) {
         if (generate_random_str(id, (size_t)CONTAINER_ID_MAX_LEN)) {
-            printf("Generate id failed\n");
+        	LOG_ERROR("Generate id failed\n");
             goto err_out;
         } else {
 			goto out;
@@ -54,7 +55,7 @@ static int maintain_container_id(const container_create_request *request, char *
 
 	id = try_generate_id();
 	if(id == NULL) {
-		printf("Failed to geneerate conatiner ID\n");
+		LOG_ERROR("Failed to geneerate conatiner ID\n");
 		ret = -1;
 		goto out;
 	}
@@ -80,7 +81,7 @@ static int do_image_create_container_rootfs_layer(const char *container_id, cons
 
 	request = common_calloc_s(sizeof(im_prepare_request));
 	if(request == NULL) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		ret = -1;
 		goto out;
 	}
@@ -109,13 +110,13 @@ int container_create(const container_create_request *request, container_create_r
 	char *id = NULL;
 
 	if(resp == NULL) {
-		printf("resp is NULL\n");
+		LOG_ERROR("resp is NULL\n");
 		return -1;
 	}
 
 	*resp = (container_create_response*)common_calloc_s(sizeof(container_create_response));
 	if(*resp == NULL) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		return -1;
 	}
 	
@@ -128,11 +129,11 @@ int container_create(const container_create_request *request, container_create_r
 	
 	ret = do_image_create_container_rootfs_layer(id, image_type, image_name, NULL, request->rootfs, &real_rootfs);
 	if(ret != 0) {
-		printf("Can not create container %s rootfs layer\n", id);
+		LOG_ERROR("Can not create container %s rootfs layer\n", id);
 		goto out;
 	}
 	
-	printf("create container %s success\n", id);
+	LOG_ERROR("create container %s success\n", id);
 out:
 	if(ret != 0)
 		(*resp)->errmsg = strdup_s("error create image");
@@ -149,13 +150,13 @@ int container_delete(const container_delete_request *request, container_delete_r
 	int ret = 0;
 
 	if(request == NULL || response == NULL) {
-		printf("Invalid NULL input\n");
+		LOG_ERROR("Invalid NULL input\n");
 		return -1;
 	}
 
 	*response = common_calloc_s(sizeof(container_delete_response));
 	if(*response == NULL) {
-		printf("Out of memory\n");
+		LOG_ERROR("Out of memory\n");
 		goto out;
 	}
 	
@@ -178,7 +179,7 @@ char *container_get_mount_point(const char *container_id) {
 
 	mp = get_container_mount_point(container_id);
 	if(mp == NULL) {
-		printf("err get mount point\n");
+		LOG_ERROR("err get mount point\n");
 		return NULL;
 	}
 	return mp;
