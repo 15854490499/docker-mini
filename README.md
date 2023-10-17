@@ -200,7 +200,6 @@ Linux下对于docker容器引擎的简单模拟
 
 后续
 ------------
-* 多线程拉取镜像。
 
 * 完善cpu、memory quota。
 

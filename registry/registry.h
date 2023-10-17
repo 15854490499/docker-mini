@@ -156,10 +156,10 @@ typedef struct _pull_descriptor_{
     char *parent_chain_id;
     // used to register layer
     char *parent_layer_id;
-    //pthread_mutex_t mutex;
+    pthread_mutex_t mutex;
     //bool mutex_inited;
-    //pthread_cond_t cond;
-    bool cond_inited;
+    pthread_cond_t cond;
+    //bool cond_inited;
 #ifdef ENABLE_IMAGE_SEARCH
     //used to search image
     char *search_name;

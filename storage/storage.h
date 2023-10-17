@@ -88,6 +88,7 @@ struct storage_rootfs_options {
 };
 
 int storage_layer_create(const char *layer_id, storage_layer_create_opts_t *copts);
+int storage_layer_delete(const char *layer_id);
 int storage_rootfs_create(const char *container_id, const char *image, const char *mount_label, json_map_string_string *storage_opts, char **mountpoint);
 int storage_rootfs_delete(const char *container_id);
 char *storage_rootfs_mount(const char *container_id);

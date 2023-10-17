@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <sys/utsname.h>
+#include <pthread.h>
 
 #include "http.h"
 #include "registry.h"
@@ -13,6 +14,12 @@
 #define MANIFEST_BIG_DATA_KEY "manifest"
 #define MAX_CONCURRENT_DOWNLOAD_NUM 5
 #define DEFAULT_WAIT_TIMEOUT 15
+
+typedef struct {
+	pull_descriptor *desc;
+	int index;
+	bool complete;
+} layer_fetch_info;
 
 int split_image_name(const char* image_name, char** host, char** name, char** tag_digest) {
 	char* tag_digest_pos = NULL;
@@ -120,12 +127,26 @@ static int prepare_pull_desc(pull_descriptor *desc, registry_pull_options *optio
 		ret = -1;
 		goto out;
 	}
-	desc->cond_inited = true;
+
+	ret = pthread_mutex_init(&desc->mutex, NULL);
+	if(ret != 0) {
+		LOG_ERROR("Failed to init mutex for pull");
+		goto out;
+	}
+
+	ret = pthread_cond_init(&desc->cond, NULL);
+	if(ret != 0) {
+		LOG_ERROR("Failed to init cond for pull");
+		goto out;
+	}
+
 	desc->image_name = strdup_s(options->image_name);
 	desc->dest_image_name = strdup_s(options->dest_image_name);
 	desc->scope = strdup_s(scope);
 	desc->cancel = false;
 	desc->rollback_layers_on_failure = true;
+	desc->register_layers_complete = false;
+	desc->pulling_number = 0;
 	desc->blobpath = strdup_s(blobpath);
 	if (options->auth.username != NULL && options->auth.password != NULL) {
         desc->username = strdup_s(options->auth.username);
@@ -430,7 +451,7 @@ static char *get_cpu_variant()
     }    
     start_pos = strchr(start_pos, ':');
     if (start_pos == NULL) {
-        printf("can not found delimiter \":\" when try to get cpu variant\n");
+        printf("can not found delimiter \":\" when try to get cpu variant");
         return NULL;
     }    
     start_pos += 1;    // skip char ":"
@@ -469,7 +490,7 @@ static int select_docker_manifest(registry_manifest_list* manifests, char** cont
 		return -1;
 	}
 	if(uname(&uts) < 0) {
-		LOG_ERROR("Failed to read host arch and os: %s\n", strerror(errno));
+		LOG_ERROR("Failed to read host arch and os: %s", strerror(errno));
 		return -1;
 	}
 	host_os = strdup_s(uts.sysname);
@@ -492,14 +513,14 @@ static int select_docker_manifest(registry_manifest_list* manifests, char** cont
 		}
 	}
 	ret = -1;
-	LOG_ERROR("Cann't match any manifest, host os %s, host arch %s\n", host_os, host_arch);
+	LOG_ERROR("Cann't match any manifest, host os %s, host arch %s", host_os, host_arch);
 out:
 	free(host_os);
 	free(host_arch);
 	if(host_variant != NULL)
 		free(host_variant);
 	if(found && (*digest == NULL || *content_type == NULL)) {
-		LOG_ERROR("Matched manifest have NULL digest or mediatype in manifest\n");
+		LOG_ERROR("Matched manifest have NULL digest or mediatype in manifest");
 		ret = -1;
 	}
 	return ret;
@@ -516,11 +537,11 @@ static int select_oci_manifest(oci_image_index *index, char **content_type, char
 	struct utsname uts;
 
 	if(index == NULL || content_type == NULL || digest == NULL) {
-		LOG_ERROR("Invalid NULL pointer\n");
+		LOG_ERROR("Invalid NULL pointer");
 		return -1;
 	}
 	if(uname(&uts) < 0) {
-		LOG_ERROR("Failed to read host arch and os: %s\n", strerror(errno));
+		LOG_ERROR("Failed to read host arch and os: %s", strerror(errno));
 		return -1;
 	}
 	host_os = strdup_s(uts.sysname);
@@ -546,7 +567,7 @@ static int select_oci_manifest(oci_image_index *index, char **content_type, char
 	}
 
 	ret = -1;
-	LOG_ERROR("Cann't match any manifest, host os %s, host arch %s, host variant %s\n", host_os, host_arch, host_variant);
+	LOG_ERROR("Cann't match any manifest, host os %s, host arch %s, host variant %s", host_os, host_arch, host_variant);
 out:
 	free(host_os);
 	host_os = NULL;
@@ -556,7 +577,7 @@ out:
 	host_variant = NULL;
 
 	if(found && (*digest == NULL || *content_type == NULL)) {
-		LOG_ERROR("Matched manifest gave NULL digest or mediatype in manifest\n");
+		LOG_ERROR("Matched manifest gave NULL digest or mediatype in manifest");
 		ret = -1;
 	}
 	return ret;
@@ -568,19 +589,19 @@ static int select_manifest(char* file, char** content_type, char** digest) {
 	oci_image_index *index = NULL;
 	char* err = NULL;
 	if(file == NULL || content_type == NULL || *content_type == NULL || digest == NULL) {
-		LOG_ERROR("Invalid NULL pointer\n");
+		LOG_ERROR("Invalid NULL pointer");
 		return -1;
 	}
 	if(!strcmp(*content_type, OCI_INDEX_V1_JSON)) {
 		index = oci_image_index_parse_file((const char*)file, NULL, &err);
 		if(index == NULL) {
-			LOG_ERROR("parse oci image index failed : %s\n", err);
+			LOG_ERROR("parse oci image index failed : %s", err);
 			ret = -1;
 			goto out;
 		}
 		ret = select_oci_manifest(index, content_type, digest);
 		if(ret != 0) {
-			LOG_ERROR("select manifest failed\n");
+			LOG_ERROR("select manifest failed");
 			ret = -1;
 			goto out;
 		}
@@ -588,18 +609,18 @@ static int select_manifest(char* file, char** content_type, char** digest) {
 	else if(!strcmp(*content_type, DOCKER_MANIFEST_SCHEMA2_LIST)) {
 		manifests = registry_manifest_list_parse_file((const char*)file, NULL, &err);
 		if(manifests == NULL) {
-			LOG_ERROR("parse docker image manifest list failed\n");
+			LOG_ERROR("parse docker image manifest list failed");
 			ret = -1;
 			goto out;
 		}
 		ret = select_docker_manifest(manifests, content_type, digest);
 		if(ret != 0) {
-			LOG_ERROR("select docker manifest failed\n");
+			LOG_ERROR("select docker manifest failed");
 			ret = -1;
 			goto out;
 		}
 	} else {
-		LOG_ERROR("Unexpected content type %s\n", *content_type);
+		LOG_ERROR("Unexpected content type %s", *content_type);
 		ret = -1;
 		goto out;
 	}
@@ -620,25 +641,25 @@ static int fetch_data(pull_descriptor *desc, char *path, char *file, char *conte
 	resp_data_type type = BODY_ONLY;
 	bool forbid_resume = false;
 	if(desc == NULL || path == NULL || file == NULL || content_type == NULL) {
-		LOG_ERROR("Invalid NULL pointer\n");
+		LOG_ERROR("Invalid NULL pointer");
 		return -1;
 	}
 	sret = snprintf(accept, MAX_ACCEPT_LEN, "Accept: %s", content_type);
 	if(sret < 0 || sret >= MAX_ACCEPT_LEN) {
-		LOG_ERROR("Failed to sprintf accept media type %s\n", content_type);
+		LOG_ERROR("Failed to sprintf accept media type %s", content_type);
 		ret = -1;
 		goto out;
 	}
 	ret = array_append(&custom_headers, accept);
 	if(ret != 0) {
-		LOG_ERROR("append accepts failed\n");
+		LOG_ERROR("append accepts failed");
 		goto out;
 	}
 	while(retry_times > 0) {
 		retry_times--;
 		ret = registry_request(desc, path, custom_headers, file, NULL, type, NULL);
 		if(ret != 0) {
-			LOG_ERROR("Get %s failed\n", path);
+			LOG_ERROR("Get %s failed", path);
 			desc->cancel = true;
 			goto out;
 		}
@@ -662,27 +683,27 @@ static int fetch_manifest_data(pull_descriptor* desc, char* file, char** content
 	char path[1024] = { 0 };
 	char* manifest_text = NULL;
 	if(desc == NULL || file == NULL || content_type == NULL || *content_type == NULL || digest == NULL) {
-		LOG_ERROR("Invalid NULL pointer\n");
+		LOG_ERROR("Invalid NULL pointer");
 		return -1;
 	}
 	if(!strcmp(*content_type, DOCKER_MANIFEST_SCHEMA2_LIST) || !strcmp(*content_type, OCI_INDEX_V1_JSON)) {
 		ret = select_manifest(file, content_type, digest);
 		if(ret != 0) {
 			manifest_text = read_text_file(file);
-			LOG_ERROR("select manifest failed, manifest:%s\n", manifest_text);
+			LOG_ERROR("select manifest failed, manifest:%s", manifest_text);
 			free(manifest_text);
 			manifest_text = NULL;
 			goto out;
 		}
 		sret = snprintf(path, sizeof(path), "/v2/%s/manifests/%s", desc->name, *digest);
 		if(sret < 0 || sret >= sizeof(path)) {
-			LOG_ERROR("Failed to sprintf path for manifest\n");
+			LOG_ERROR("Failed to sprintf path for manifest");
 			ret = -1;
 			goto out;
 		}
 		ret = fetch_data(desc, path, file, *content_type, *digest);
 		if(ret != 0) {
-			LOG_ERROR("registry: Get %s failed, path\n", path);
+			LOG_ERROR("registry: Get %s failed, path", path);
 			goto out;
 		}
 	}
@@ -698,13 +719,13 @@ static int fetch_manifest(pull_descriptor *desc) {
 	char *digest = NULL;
 
 	if(desc == NULL) {
-		LOG_ERROR("Invalid NULL pointer\n");
+		LOG_ERROR("Invalid NULL pointer");
 		return -1;
 	}
 
 	sret = snprintf(file, sizeof(file), "%s/manifest", desc->blobpath);
 	if(sret < 0 || (size_t)sret >= sizeof(file)) {
-		LOG_ERROR("Failed to sprintf file for manifest\n");
+		LOG_ERROR("Failed to sprintf file for manifest");
 		return -1;
 	}
 
@@ -716,7 +737,7 @@ static int fetch_manifest(pull_descriptor *desc) {
 
 	ret = fetch_manifest_data(desc, file, &content_type, &digest);
 	if(ret != 0) {
-		LOG_ERROR("fetch manifest data err!\n");
+		LOG_ERROR("fetch manifest data err!");
 		return -1;
 	}
 	desc->manifest.media_type = strdup_s(content_type);
@@ -735,7 +756,7 @@ static int parse_manifest_schema2(pull_descriptor* desc) {
 	parser_error err;
 	manifest = registry_manifest_schema2_parse_file(desc->manifest.file, NULL, &err);
 	if(manifest == NULL) {
-		LOG_ERROR("parse manifest schema2 failed\n");
+		LOG_ERROR("parse manifest schema2 failed");
 		ret = -1;
 		goto out;
 	}
@@ -744,7 +765,7 @@ static int parse_manifest_schema2(pull_descriptor* desc) {
 	desc->config.size = manifest->config->size;
 	desc->layers = calloc_s(sizeof(layer_blob), manifest->layers_len);
 	if(desc->layers == NULL) {
-		LOG_ERROR("out of memory\n");
+		LOG_ERROR("out of memory");
 		ret = -1;
 		goto out;
 	}
@@ -776,7 +797,7 @@ static int parse_manifest_ociv1(pull_descriptor *desc) {
 	size_t i = 0;
 	manifest = oci_image_manifest_parse_file(desc->manifest.file, NULL, &err);
 	if(manifest == NULL) {
-		LOG_ERROR("parse manifest oci v1 failed, err : %s\n", err);
+		LOG_ERROR("parse manifest oci v1 failed, err : %s", err);
 		ret = -1;
 		goto out;
 	}
@@ -784,13 +805,13 @@ static int parse_manifest_ociv1(pull_descriptor *desc) {
 	desc->config.digest = strdup_s(manifest->config->digest);
 	desc->config.size = manifest->config->size;
 	if(manifest->layers_len > MAX_LAYER_NUM) {
-		LOG_ERROR("Invalid layer number %zu, maxium is %d\n", manifest->layers_len, MAX_LAYER_NUM);
+		LOG_ERROR("Invalid layer number %zu, maxium is %d", manifest->layers_len, MAX_LAYER_NUM);
 		ret = -1;
 		goto out;
 	}
 	desc->layers = calloc_s(sizeof(layer_blob), manifest->layers_len);
 	if(desc->layers == NULL) {
-		LOG_ERROR("out of memory\n");
+		LOG_ERROR("out of memory");
 		ret = -1;
 		goto out;
 	}
@@ -831,11 +852,11 @@ static int parse_manifest(pull_descriptor* desc) {
 	} else if(!strcmp(media_type, OCI_MANIFEST_V1_JSON)){
 		ret = parse_manifest_ociv1(desc);
 	} else {
-		LOG_ERROR("Unsupported manifest media type %s\n", desc->manifest.media_type);
+		LOG_ERROR("Unsupported manifest media type %s", desc->manifest.media_type);
 		return -1;
 	}
 	if(ret != 0) {
-		LOG_ERROR("parse manifest failed, media_type %s\n", desc->manifest.media_type);
+		LOG_ERROR("parse manifest failed, media_type %s", desc->manifest.media_type);
 	}
 	return ret;
 }
@@ -844,19 +865,19 @@ static int fetch_and_parse_manifest(pull_descriptor *desc) {
 	int ret = 0;
 
 	if(desc == NULL) {
-		LOG_ERROR("Invalid NULL param\n");
+		LOG_ERROR("Invalid NULL param");
 		return -1;
 	}
 
 	ret = fetch_manifest(desc);
 	if(ret != 0) {
-		LOG_ERROR("fetch manifest failed\n");
+		LOG_ERROR("fetch manifest failed");
 		goto out;
 	}
 
 	ret = parse_manifest(desc);
 	if(ret != 0) {
-		LOG_ERROR("parse manifest failed\n");
+		LOG_ERROR("parse manifest failed");
 		goto out;
 	}
 out:
@@ -869,23 +890,23 @@ static int fetch_config(pull_descriptor* desc) {
 	char file[PATH_MAX] = { 0 };
 	char path[PATH_MAX] = { 0 };
 	if(desc == NULL) {
-		LOG_ERROR("invalid NULL pointer\n");
+		LOG_ERROR("invalid NULL pointer");
 		return -1;
 	}
 	sret = snprintf(file, sizeof(file), "%s/config", desc->blobpath);
 	if(sret < 0 || sret >= sizeof(file)) {
-		LOG_ERROR("Failed to sprintf file for config\n");
+		LOG_ERROR("Failed to sprintf file for config");
 		return -1;
 	}
 	sret = snprintf(path, sizeof(path), "/v2/%s/blobs/%s", desc->name, desc->config.digest);
 	if(sret < 0 || sret >= sizeof(path)) {
-		LOG_ERROR("Failed to sprintf path for config\n");
+		LOG_ERROR("Failed to sprintf path for config");
 		ret = -1;
 		goto out;
 	}
 	ret = fetch_data(desc, path, file, desc->config.media_type, desc->config.digest);
 	if(ret != 0) {
-		LOG_ERROR("registry: Get %s failed\n", path);
+		LOG_ERROR("registry: Get %s failed", path);
 		goto out;
 	}
 	desc->config.file = strdup_s(file);
@@ -901,12 +922,12 @@ static char *calc_chain_id(char *parent_chain_id, char *diff_id)
     char* full_digest = NULL;
 
     if (parent_chain_id == NULL || diff_id == NULL) {
-        printf("Invalid NULL param\n");
+        LOG_ERROR("Invalid NULL param");
         return NULL;
     }    
 
     if (strlen(diff_id) <= strlen(SHA256_PREFIX)) {
-        printf("Invalid diff id %s found when calc chain id\n", diff_id);
+        LOG_ERROR("Invalid diff id %s found when calc chain id", diff_id);
         return NULL;
     }    
 
@@ -915,20 +936,20 @@ static char *calc_chain_id(char *parent_chain_id, char *diff_id)
     }    
 
     if (strlen(parent_chain_id) <= strlen(SHA256_PREFIX)) {
-        printf("Invalid parent chain id %s found when calc chain id\n", parent_chain_id);
+        LOG_ERROR("Invalid parent chain id %s found when calc chain id", parent_chain_id);
         return NULL;
     }    
 
     sret = snprintf(tmp_buffer, sizeof(tmp_buffer), "%s+%s", parent_chain_id + strlen(SHA256_PREFIX),
                     diff_id + strlen(SHA256_PREFIX));
     if (sret < 0 || (size_t)sret >= sizeof(tmp_buffer)) {
-        printf("Failed to sprintf chain id original string\n");
+        LOG_ERROR("Failed to sprintf chain id original string");
         return NULL;
     }    
 
     digest = sha256_digest_str(tmp_buffer);
     if (digest == NULL) {
-        printf("Failed to calculate chain id\n");
+        LOG_ERROR("Failed to calculate chain id");
         goto out;
     }
 
@@ -951,12 +972,12 @@ static int parse_docker_config(pull_descriptor* desc) {
 	parser_error err;
 	config = docker_image_config_v2_parse_file(desc->config.file, NULL, &err);
 	if(config == NULL) {
-		LOG_ERROR("parse image config v2 failed\n");
+		LOG_ERROR("parse image config v2 failed");
 		ret = -1;
 		goto out;
 	}
 	if(config->rootfs == NULL || config->rootfs->diff_ids_len == 0) {
-		LOG_ERROR("No rootfd found in config\n");
+		LOG_ERROR("No rootfd found in config");
 		ret = -1;
 		goto out;
 	}
@@ -965,7 +986,7 @@ static int parse_docker_config(pull_descriptor* desc) {
 		desc->layers[i].diff_id = strdup_s(diff_id);
 		desc->layers[i].chain_id = calc_chain_id(parent_chain_id, diff_id);
 		if(desc->layers[i].chain_id == NULL) {
-			LOG_ERROR("calc chain id failed, diff id %s, parent chain id %s\n", diff_id, parent_chain_id);
+			LOG_ERROR("calc chain id failed, diff id %s, parent chain id %s", diff_id, parent_chain_id);
 			ret = -1;
 			goto out;
 		}
@@ -995,13 +1016,13 @@ static int parse_oci_config(pull_descriptor *desc) {
 
 	config = oci_image_spec_parse_file(desc->config.file, NULL, &err);
 	if(config == NULL) {
-		LOG_ERROR("parse image config v2 failed, err: %s\n", err);
+		LOG_ERROR("parse image config v2 failed, err: %s", err);
 		ret = -1;
 		goto out;
 	}
 
 	if(config->rootfs == NULL || config->rootfs->diff_ids_len == 0) {
-		LOG_ERROR("No rootfs found in config\n");
+		LOG_ERROR("No rootfs found in config");
 		ret = -1;
 		goto out;
 	}
@@ -1011,7 +1032,7 @@ static int parse_oci_config(pull_descriptor *desc) {
 		desc->layers[i].diff_id = strdup_s(diff_id);
 		desc->layers[i].chain_id = calc_chain_id(parent_chain_id, diff_id);
 		if(desc->layers[i].chain_id == NULL) {
-			LOG_ERROR("calc chain id failed, diff id %s, parent chain id %s\n", diff_id, parent_chain_id);
+			LOG_ERROR("calc chain id failed, diff id %s, parent chain id %s", diff_id, parent_chain_id);
 			ret = -1;
 			goto out;
 		}
@@ -1031,7 +1052,7 @@ static int parse_config(pull_descriptor* desc) {
 	char* media_type = NULL;
 	char* manifest_media_type = NULL;
 	if(desc == NULL) {
-		LOG_ERROR("invalid NULL pointer\n");
+		LOG_ERROR("invalid NULL pointer");
 		return -1;
 	}
 	media_type = desc->config.media_type;
@@ -1045,7 +1066,7 @@ static int parse_config(pull_descriptor* desc) {
 		return -1;
 	}
 	if(ret != 0) {
-		LOG_ERROR("parse config failed\n");
+		LOG_ERROR("parse config failed");
 		return ret;
 	}
 	return ret;
@@ -1054,17 +1075,17 @@ static int parse_config(pull_descriptor* desc) {
 static int fetch_and_parse_config(pull_descriptor* desc) {
 	int ret = 0;
 	if(desc == NULL) {
-		LOG_ERROR("Invalid NULL param\n");
+		LOG_ERROR("Invalid NULL param");
 		return -1;
 	}
 	ret = fetch_config(desc);
 	if(ret != 0) {
-		LOG_ERROR("fetch config failed\n");
+		LOG_ERROR("fetch config failed");
 		return -1;
 	}
 	ret = parse_config(desc);
 	if(ret != 0) {
-		LOG_ERROR("parse config failed\n");
+		LOG_ERROR("parse config failed");
 		return -1;
 	}
 	return 0;
@@ -1077,24 +1098,24 @@ int fetch_layer(pull_descriptor* desc, size_t index) {
 	char path[PATH_MAX] = { 0 };
 	layer_blob* layer = NULL;
 	if(index >= desc->layers_len) {
-		LOG_ERROR("Invalid layer index\n");
+		LOG_ERROR("Invalid layer index");
 		return -1;
 	}
 	sret = snprintf(file, sizeof(file), "%s/%zu", desc->blobpath, index);
 	if(sret < 0 || (size_t)sret >= sizeof(file)) {
-		LOG_ERROR("Failed to sprintf file for layer %zu\n", index);
+		LOG_ERROR("Failed to sprintf file for layer %zu", index);
 		return -1;
 	}
 	layer = &desc->layers[index];
 	sret = snprintf(path, sizeof(path), "/v2/%s/blobs/%s", desc->name, layer->digest);
 	if(sret < 0 || (size_t)sret >= sizeof(path)) {
-		LOG_ERROR("Failed to sprintf path for layer %zu\n", index);
+		LOG_ERROR("Failed to sprintf path for layer %zu", index);
 		ret = -1;
 		goto out;
 	}
 	ret = fetch_data(desc, path, file, layer->media_type, layer->digest);
 	if(ret != 0) {
-		LOG_ERROR("registry: Get %s failed\n", path);
+		LOG_ERROR("registry: Get %s failed", path);
 		goto out;
 	}
 out:
@@ -1110,18 +1131,53 @@ static int set_info_to_desc(pull_descriptor *desc, size_t i, char *file) {
 		return 0;
 	}
 	if(desc->layers[i].diff_id == NULL) {
-		LOG_ERROR("layer %ld of image %s have invalid NULL diffid\n", i, desc->image_name);
+		LOG_ERROR("layer %ld of image %s have invalid NULL diffid", i, desc->image_name);
 		return -1;
 	}
 	if(desc->layers[i].chain_id == NULL) {
 		desc->layers[i].chain_id = calc_chain_id(desc->parent_chain_id, desc->layers[i].diff_id);
 		if(desc->layers[i].chain_id == NULL) {
-			LOG_ERROR("calc chain id failed\n");
+			LOG_ERROR("calc chain id failed");
 			return -1;
 		}
 	}
 	desc->parent_chain_id = desc->layers[i].chain_id;
 	return 0;
+}
+
+static void *fetch_layer_in_thread(void *arg) {
+	layer_fetch_info *info = (layer_fetch_info*)arg;
+	int index = 0;
+	int ret = 0;
+	pull_descriptor *desc = NULL;
+
+	ret = pthread_detach(pthread_self());
+	if(ret != 0) {
+		LOG_ERROR("Set thread detach fail");
+		goto out;
+	}
+	
+	desc = info->desc;
+	index = info->index;
+	if(fetch_layer(desc, index) != 0) {
+		LOG_ERROR("fetch layer %zu failed", index);
+		ret = -1;
+		goto out;
+	}
+
+out:
+	pthread_mutex_lock(&desc->mutex);
+	if(ret != 0) {
+		desc->cancel = true;
+	}
+	desc->pulling_number--;
+	if(pthread_cond_broadcast(&desc->cond)) {
+		LOG_ERROR("Failed to broadcast");
+	}
+	info->complete = true;
+	pthread_mutex_unlock(&desc->mutex);
+
+	return NULL;
 }
 
 static int register_layer(pull_descriptor *desc, size_t i) {
@@ -1159,67 +1215,184 @@ static int register_layer(pull_descriptor *desc, size_t i) {
 	return 0;
 }
 
-static int register_layers(pull_descriptor *desc) {
+static bool wait_fetch_complete(layer_fetch_info *info) {
+	pull_descriptor *desc = info->desc;
+
+	if(desc->cancel) {
+		return true;
+	}
+
+	return info->complete;
+}
+
+static void *register_layers_in_thread(void *arg) {
+	layer_fetch_info *infos = (layer_fetch_info*)arg;
+	pull_descriptor *desc = NULL;
 	int ret = 0;
 	size_t i = 0;
+	int cond_ret = 0;
+	struct timespec ts = { 0 };
+
+	ret = pthread_detach(pthread_self());
+	if(ret != 0) {
+		LOG_ERROR("set thread detach fail");
+		goto out;
+	}
+	
+	desc = infos[0].desc;
 	for(i = 0; i < desc->layers_len; i++) {
+		while(!wait_fetch_complete(&infos[i])) {
+			pthread_mutex_lock(&desc->mutex);
+			ts.tv_sec = time(NULL) + DEFAULT_WAIT_TIMEOUT;
+			cond_ret = pthread_cond_timedwait(&desc->cond, &desc->mutex, &ts);
+			pthread_mutex_unlock(&desc->mutex);
+			if(cond_ret != 0 && cond_ret != ETIMEDOUT) {
+				LOG_ERROR("condition wait for layer %zu to complete failed, ret %d, error: %s", i, cond_ret,
+                      strerror(errno));
+				sleep(10);
+				continue;
+			}
+		}
+
 		if(desc->cancel) {
 			ret = -1;
 			goto out;
 		}
+
 		ret = register_layer(desc, i);
 		if(ret != 0) {
-			LOG_ERROR("register layers for image %s failed\n", desc->image_name);
+			LOG_ERROR("register layers for image %s failed", desc->image_name);
 			goto out;
 		}
 	}
 out:
+	pthread_mutex_lock(&desc->mutex);
 	if(ret != 0) {
 		desc->cancel = true;
 	}
 	desc->register_layers_complete = true;
+	if(pthread_cond_broadcast(&desc->cond)) {
+		LOG_ERROR("Failed to broadcast");
+	}
+	pthread_mutex_unlock(&desc->mutex);
 	return 0;
+}
+
+bool all_fetch_task_complete(layer_fetch_info *infos) {
+	pull_descriptor *desc = infos[0].desc;
+	int i = 0;
+
+	if(!desc->register_layers_complete) {
+		return false;
+	}
+
+	for(i = 0; i < desc->layers_len; i++) {
+		if(!infos[i].complete) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void roll_back_on_fetch_failure(pull_descriptor *desc) {
+	int i = 0;
+	char *id = NULL;
+
+	for(i = 0; i < desc->layers_len; i++) {	
+		if(desc->layers[i].registered) {
+			id = without_sha256_prefix(desc->layers[i].chain_id);
+			storage_layer_delete(id);		
+		}
+	}
+
+	return;
 }
 
 static int fetch_all(pull_descriptor* desc) {
 	size_t i, j;
 	int ret, sret;
+	int cond_ret = 0;
 	char file[PATH_MAX] = { 0 };
 	char *parent_chain_id = NULL;
+	struct timespec ts = { 0 };
+	layer_fetch_info *infos = NULL;
+	pthread_t tid = 0;
+
 	if(desc == NULL) {
-		LOG_ERROR("invalid NULL param\n");
+		LOG_ERROR("invalid NULL param");
 		return -1;
 	}
+
 	ret = fetch_and_parse_config(desc);
 	if(ret != 0) {
-		LOG_ERROR("fetch and parse config failed\n");
+		LOG_ERROR("fetch and parse config failed");
 		return -1;
 	}
+
+	infos = (layer_fetch_info*)calloc_s(desc->layers_len, sizeof(layer_fetch_info));
+	if(infos == NULL) {
+		LOG_ERROR("memory out");
+		return -1;
+	}
+
 	for(i = 0; i < desc->layers_len; i++) {
 		parent_chain_id = NULL;
 		sret = snprintf(file, sizeof(file), "%s/%zu", desc->blobpath, i);
 		if(sret < 0 || (size_t)sret >= sizeof(file)) {
-			LOG_ERROR("Failed to sprintf file for layer %ld\n", i);
+			LOG_ERROR("Failed to sprintf file for layer %ld", i);
 			ret = -1;
 			break;
 		}
 		sret = set_info_to_desc(desc, i, file);
 		if(sret != 0) {
-			LOG_ERROR("set info to desc failed\n");
+			LOG_ERROR("set info to desc failed");
 			ret = -1;
 			break;
 		}
-		sret = fetch_layer(desc, i);
-		if(sret != 0) {
-			LOG_ERROR("fetch layer %zu failed\n", i);
-			break;
-		}
+		infos[i].desc = desc;
+		infos[i].index = i;
+		infos[i].complete = false;
+        if (pthread_create(&tid, NULL, fetch_layer_in_thread, &infos[i])) {
+            LOG_ERROR("failed to start thread to fetch layers");
+            ret = -1;
+            break;
+        }
+		desc->pulling_number++;
+	}
 
+	if(ret != 0) {
+		desc->cancel = true;
+		desc->register_layers_complete = true;
+	} else {
+		if(pthread_create(&tid, NULL, register_layers_in_thread, infos)) {
+			LOG_ERROR("Failed to start thread to unpack layers");
+			ret = -1;
+			desc->register_layers_complete = true;
+		}
 	}
-	if(sret != 0) {
-		return ret;
+	
+	while(!all_fetch_task_complete(infos)) {
+		pthread_mutex_lock(&desc->mutex);
+		ts.tv_sec = time(NULL) + DEFAULT_WAIT_TIMEOUT;
+		cond_ret = pthread_cond_timedwait(&desc->cond, &desc->mutex, &ts);
+		pthread_mutex_unlock(&desc->mutex);
+		if(cond_ret != 0 && cond_ret != ETIMEDOUT) {
+			LOG_ERROR("condition wait for all layers to complete failed, ret %d, error: %s", cond_ret, strerror(errno));
+			sleep(10);
+			continue;
+		}
 	}
-	register_layers(desc);
+	
+	if(desc->rollback_layers_on_failure && desc->cancel == true) {
+		LOG_ERROR("fetch failed and roll back");
+		roll_back_on_fetch_failure(desc);
+	}
+
+	/*for(i = 0; i < desc->layers_len; i++) {
+		free_layer_fetch_info(&infos[i]);
+	}*/
+	free(infos);
 	return ret;
 }
 
@@ -1554,30 +1727,30 @@ int registry_pull(registry_pull_options *pull_options) {
 	bool reuse = false;
 	
 	if(pull_options == NULL || pull_options->image_name == NULL) {
-		LOG_ERROR("Invalid NULL param\n");
+		LOG_ERROR("Invalid NULL param");
 		return -1;
 	}
 	desc = common_calloc_s(sizeof(pull_descriptor));
 	if(desc == NULL) {
-		LOG_ERROR("Out of memory\n");
+		LOG_ERROR("Out of memory");
 		return -1;
 	}
 	ret = prepare_pull_desc(desc, pull_options);
 	if(ret != 0) {
-		LOG_ERROR("registry prepare failed\n");
+		LOG_ERROR("registry prepare failed");
 		ret = -1;
 		goto out;
 	}
 	ret = registry_fetch(desc, &reuse);
 	if(ret != 0) {
-		LOG_ERROR("error fetching %s\n", pull_options->image_name);
+		LOG_ERROR("error fetching %s", pull_options->image_name);
 		ret = -1;
 		goto out;
 	}
 	if(!reuse) {
 		ret = register_image(desc);
 		if(ret != 0) {
-			LOG_ERROR("error register image %s to store\n", pull_options->image_name);
+			LOG_ERROR("error register image %s to store", pull_options->image_name);
 			ret = -1;
 			goto out;
 		}

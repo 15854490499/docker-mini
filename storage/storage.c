@@ -1025,7 +1025,7 @@ static int delete_img_related_layers(const char *img_id, const char *img_top_lay
 
 	layer_id = strdup_s(img_top_layer_id);
 	if(layer_id == NULL) {
-		LOG_ERROR("Memory out %s\n", img_id);
+		LOG_ERROR("Memory out %s", img_id);
 		ret = -1;
 		goto out;
 	}
@@ -1034,13 +1034,13 @@ static int delete_img_related_layers(const char *img_id, const char *img_top_lay
 		layer_info = layer_store_lookup(layer_id);
 		
 		if(layer_info == NULL) {
-			LOG_ERROR("Failed to get layer info for layer %s\n", layer_id);
+			LOG_ERROR("Failed to get layer info for layer %s", layer_id);
 			ret = -1;
 			goto out;
 		}
 
 		if(layer_store_delete(layer_id) != 0) {
-			LOG_ERROR("Failed ro remove layer %s\n", layer_id);
+			LOG_ERROR("Failed ro remove layer %s", layer_id);
 			ret = -1;
 			goto out;
 		}
@@ -1068,20 +1068,20 @@ static int check_image_occupancy_status(const char *img_id, bool *in_using) {
 
 	all_rootfs = common_calloc_s(sizeof(struct rootfs_list));
 	if(all_rootfs == NULL) {
-		LOG_ERROR("Out of known\n");
+		LOG_ERROR("Out of known");
 		ret = -1;
 		goto out;
 	}
 
 	if(rootfs_store_get_all_rootfs(all_rootfs) != 0) {
-		LOG_ERROR("Failed to get all container rootfs info\n");
+		LOG_ERROR("Failed to get all container rootfs info");
 		ret = -1;
 		goto out;
 	}
 
 	for(i = 0; i < all_rootfs->rootfs_len; i++) {
 		if(strcmp(all_rootfs->rootfs[i]->image, img_id) == 0) {
-			LOG_ERROR("Image used by %s\n", all_rootfs->rootfs[i]->id);
+			LOG_ERROR("Image used by %s", all_rootfs->rootfs[i]->id);
 			*in_using = true;
 			goto out;
 		}
@@ -1390,27 +1390,27 @@ int storage_layer_create(const char *layer_id, storage_layer_create_opts_t *copt
 	struct io_read_wrapper *reader = NULL;
 	struct layer_opts *opts = NULL;
 	if(copts == NULL) {
-		LOG_ERROR("Create opts is null\n");
+		LOG_ERROR("Create opts is null");
 	}
 	if(!copts->writable && copts->layer_data_path == NULL) {
-		LOG_ERROR("Invalid arguments for put ro layer\n");
+		LOG_ERROR("Invalid arguments for put ro layer");
 		ret = -1;
 		goto out;
 	}
 	if(fill_read_wrapper(copts->layer_data_path, &reader) != 0) {
-		LOG_ERROR("Failed to fill layer read wrapper\n");
+		LOG_ERROR("Failed to fill layer read wrapper");
 		ret = -1;
 		goto out;
 	}
 	opts = fill_create_layer_opts(copts, NULL);
 	if(opts == NULL) {
-		LOG_ERROR("Failed to fill create ro layer options\n");
+		LOG_ERROR("Failed to fill create ro layer options");
 		ret = -1;
 		goto out;
 	}
 	ret = layer_store_create(layer_id, opts, reader, NULL);
 	if(ret != 0) {
-		LOG_ERROR("Failed to call layer store create\n");
+		LOG_ERROR("Failed to call layer store create");
 		ret = -1;
 		goto out;
 	}
@@ -1422,6 +1422,20 @@ out:
 		free(reader);
 	}
 	free(opts);
+	return ret;
+}
+
+int storage_layer_delete(const char *layer_id) {
+	int ret = 0;
+
+	ret = layer_store_delete(layer_id);
+	if(ret != 0) {
+		LOG_ERROR("Failed ro remove layer %s", layer_id);
+		ret = -1;
+		goto out;
+	}
+
+out:
 	return ret;
 }
 
