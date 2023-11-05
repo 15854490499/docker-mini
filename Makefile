@@ -45,6 +45,10 @@ OBJ := network.o nl.o http.o utils.o sha256.o timestamp.o \
 		 oci_image_manifest.o \
 		 oci_image_content_descriptor.o \
 		 oci_image_spec.o \
+		 oci_runtime_config_linux.o \
+	 	 oci_runtime_defs.o \
+	     oci_runtime_defs_linux.o \
+	     oci_runtime_spec.o \
 		 asynclog.o \
 		 log.o \
 		 configs_constants.o \

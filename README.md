@@ -174,7 +174,13 @@ Linux下对于docker容器引擎的简单模拟
 * 启动容器
 
 	```C++
-    bin/./docker-mini start container-id
+    bin/./docker-mini start container-id  
+	  
+
+	--memory / -m 添加cgroup memory limit，如-m 10485760  
+	  
+
+	--cpu-period / --cpu-quota 添加cgroup cpu cfs调度资源限制，如--cpu-period 100000 --cpu-quota 30000
 	```  
 
 	以启动nginx为镜像的容器为例，演示nginx容器启动。  
