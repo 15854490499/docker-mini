@@ -2170,6 +2170,10 @@ src/oci_image_stamp: src/ocispec/json_common.h src/ocispec/json_common.c
 	$(PYTHON) $(srcdir)/src/ocispec/generate.py --gen-ref --root=${srcdir} --out=${builddir} ${srcdir}/oci/image
 	@touch $@
 
+src/oci_runtime_stamp: src/ocispec/json_common.h src/ocispec/json_common.c
+	$(PYTHON) $(srcdir)/src/ocispec/generate.py --gen-ref --root=${srcdir} --out=${builddir} ${srcdir}/oci/runtime
+	@touch $@
+
 src/configs_stamp: src/ocispec/json_common.h src/ocispec/json_common.c
 	$(PYTHON) $(srcdir)/src/ocispec/generate.py --gen-ref --root=${srcdir} --out=${builddir} ${srcdir}/configs
 	@touch $@
@@ -2238,7 +2242,7 @@ src/ocispec/basic_test_double_array_item.h \
 
 $(HEADER_FILES): %.h: %.c src/ocispec/generate.py
 
-libocispec.a: libocispec.la $(BUILT_SOURCES) src/runtime_spec_stamp src/image_spec_stamp src/image_manifest_stamp src/basic-test_stamp src/oci_image_stamp src/storage_stamp src/container_stamp src/registry_stamp src/configs_stamp
+libocispec.a: libocispec.la $(BUILT_SOURCES) src/oci_image_stamp src/storage_stamp src/container_stamp src/registry_stamp src/configs_stamp src/oci_runtime_stamp
 	$(LIBTOOL) --mode=link $(GCC) libocispec.la -o libocispec.a
 
 $(abs_top_builddir)/tests/data: $(abs_top_srcdir)/tests/data
@@ -2253,11 +2257,7 @@ sync:
 	(cd runtime-spec; git pull https://github.com/opencontainers/runtime-spec)
 	(cd yajl; git pull https://github.com/containers/yajl main)
 
-generate: src/runtime_spec_stamp \
-	src/image_spec_stamp \
-	src/image_manifest_stamp \
-	src/basic-test_stamp \
-	src/storage_stamp \
+generate: src/storage_stamp \
 	src/container_stamp \
 	src/oci_image_stamp \
 	src/registry_stamp \

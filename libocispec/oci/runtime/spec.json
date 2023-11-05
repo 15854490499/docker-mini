@@ -1,0 +1,48 @@
+{
+    "description": "Open Container Runtime Specification Container Configuration Schema",
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "id": "https://opencontainers.org/schema/bundle",
+    "type": "object",
+    "properties": {
+        "ociVersion": {
+            "id": "https://opencontainers.org/schema/bundle/ociVersion",
+            "$ref": "./defs.json#/definitions/ociVersion"
+        },
+        "hostname": {
+            "id": "https://opencontainers.org/schema/bundle/hostname",
+            "type": "string"
+        },
+        "mounts": {
+            "id": "https://opencontainers.org/schema/bundle/mounts",
+            "type": "array",
+            "items": {
+                "$ref": "./defs.json#/definitions/Mount"
+            }
+        },
+        "root": {
+            "description": "Configures the container's root filesystem.",
+            "id": "https://opencontainers.org/schema/bundle/root",
+            "type": "object",
+            "required": [
+                "path"
+            ],
+            "properties": {
+                "path": {
+                    "id": "https://opencontainers.org/schema/bundle/root/path",
+                    "$ref": "./defs.json#/definitions/FilePath"
+                },
+                "readonly": {
+                    "id": "https://opencontainers.org/schema/bundle/root/readonly",
+                    "type": "boolean"
+                }
+            }
+        },
+        "linux": {
+            "$ref": "config-linux.json#/linux"
+        }
+    },
+    "required": [
+        "ociVersion"
+    ]
+}
+

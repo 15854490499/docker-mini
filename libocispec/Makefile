@@ -27,6 +27,10 @@ all: $(OBJ_DIR)/json_common.o \
 	 $(OBJ_DIR)/oci_image_manifest.o \
 	 $(OBJ_DIR)/oci_image_content_descriptor.o \
 	 $(OBJ_DIR)/oci_image_spec.o \
+	 $(OBJ_DIR)/oci_runtime_config_linux.o \
+	 $(OBJ_DIR)/oci_runtime_defs.o \
+	 $(OBJ_DIR)/oci_runtime_defs_linux.o \
+	 $(OBJ_DIR)/oci_runtime_spec.o \
 	 $(OBJ_DIR)/configs_constants.o
 
 $(OBJ_DIR)/json_common.o: json_common.c
@@ -86,6 +90,14 @@ $(OBJ_DIR)/oci_image_manifest.o: oci_image_manifest.c
 $(OBJ_DIR)/oci_image_content_descriptor.o: oci_image_content_descriptor.c
 	$(C) -c $< -o $@
 $(OBJ_DIR)/oci_image_spec.o: oci_image_spec.c
+	$(C) -c $< -o $@
+$(OBJ_DIR)/oci_runtime_spec.o: oci_runtime_spec.c
+	$(C) -c $< -o $@
+$(OBJ_DIR)/oci_runtime_config_linux.o: oci_runtime_config_linux.c
+	$(C) -c $< -o $@
+$(OBJ_DIR)/oci_runtime_defs_linux.o: oci_runtime_defs_linux.c
+	$(C) -c $< -o $@
+$(OBJ_DIR)/oci_runtime_defs.o: oci_runtime_defs.c
 	$(C) -c $< -o $@
 $(OBJ_DIR)/configs_constants.o: configs_constants.c
 	$(C) -c $< -o $@

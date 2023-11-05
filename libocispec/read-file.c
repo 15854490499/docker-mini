@@ -37,7 +37,6 @@ fread_file (FILE *stream, size_t *length)
     if (fstat (fileno (stream), &st) >= 0 && S_ISREG (st.st_mode))
       {
         off_t pos = ftello (stream);
-
         if (pos >= 0 && pos < st.st_size)
           {
             off_t alloc_off = st.st_size - pos;
@@ -120,11 +119,12 @@ read_file (const char *path, size_t *length)
   char *buf;
   int save_errno;
 
-  if (!f)
+  if (!f) {
+	printf("f == NULL %s \n", path);
     return NULL;
+  }
 
   buf = fread_file (f, length);
-
   save_errno = errno;
 
   if (fclose (f) != 0)
