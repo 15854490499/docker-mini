@@ -9,9 +9,10 @@ extern "C" {
 
 #define kSmallBuffer 4096
 #define kLargeBuffer 4096 * 1024
+#define shm_file "/dev/shm/shm.docker-mini"
 
 typedef struct Buffer_item {
-	char *data;
+	char data[kLargeBuffer];
 	int size;
 } buffer_item;
 
@@ -25,6 +26,7 @@ struct LogBuffer {
 typedef struct Asynclog_ {
 	pthread_mutex_t m_mutex;
 	pthread_cond_t m_cond;
+	int shm_id;
 	struct LogBuffer buffer;
 	char *filename;
 	void (*append)(char *log_str, int log_str_len);

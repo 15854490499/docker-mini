@@ -1,5 +1,8 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 #include <assert.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -13,6 +16,8 @@ static asynclog *g_asynclog;
 static bool running_ = false;
 static pthread_t tid; 
 static pthread_mutex_t mutex;
+static pthread_mutexattr_t mutexattr;
+static pthread_condattr_t condattr;
 
 void start();
 void append(char *log_str, int log_str_len);
@@ -34,15 +39,36 @@ void once_init() {
 		exit(1);
 	}
 	g_asynclog->filename = strdup_s(log_full_name);
-	pthread_mutex_init(&mutex, NULL);
-	pthread_mutex_init(&g_asynclog->m_mutex, NULL);
-	pthread_cond_init(&g_asynclog->m_cond, NULL);
-	g_asynclog->buffer.datas = (buffer_item*)common_calloc_s(sizeof(buffer_item) * 16);
-	g_asynclog->buffer.buffer_size = 16;
+	pthread_mutexattr_setpshared(&mutexattr, PTHREAD_PROCESS_SHARED);
+	pthread_condattr_setpshared(&condattr, PTHREAD_PROCESS_SHARED);
+	pthread_mutex_init(&mutex, &mutexattr);
+	pthread_mutex_init(&g_asynclog->m_mutex, &mutexattr);
+	pthread_cond_init(&g_asynclog->m_cond, &condattr);
+	open(shm_file, O_CREAT | O_RDWR, 0666);
+	key_t shm_key = ftok(shm_file, 1);
+	g_asynclog->buffer.buffer_size = 6;
+	g_asynclog->shm_id = shmget(shm_key, sizeof(buffer_item) * g_asynclog->buffer.buffer_size, IPC_CREAT);
+	if(g_asynclog->shm_id < 0) {
+		printf("obtain shared memory failed : %s\n", strerror(errno));
+		goto err_out;
+	}
+	g_asynclog->buffer.datas = (buffer_item*)shmat(g_asynclog->shm_id, NULL, 0);//common_calloc_s(sizeof(buffer_item) * 16);
+	if(g_asynclog->buffer.datas == -1) {
+		printf("attach shared memory to %d failed : %s\n", getpid(), strerror(errno));
+		goto err_out;
+	}
+	memset(g_asynclog->buffer.datas, 0, sizeof(buffer_item) * g_asynclog->buffer.buffer_size);
 	g_asynclog->buffer.pput = 0;
 	g_asynclog->buffer.pget = 0;
-}
+	goto out;
 
+err_out:
+	if(g_asynclog->shm_id >= 0) {
+		shmctl(g_asynclog->shm_id, IPC_RMID, NULL);
+	}
+out:
+	return;
+}
 asynclog *get_g_asynclog() {
 	pthread_once(&once_control_, once_init);
 	pthread_mutex_lock(&mutex);
@@ -66,10 +92,10 @@ void append(char *log_str, int log_str_len) {
 		}
 		curb = &(g_asynclog->buffer.datas[g_asynclog->buffer.pput]);
 	}
-	if(curb->data == NULL) {
+	/*if(curb->data == NULL) {
 		curb->data = (char*)common_calloc_s(kLargeBuffer);
 		curb->size = 0;
-	}
+	}*/
 	memcpy(curb->data + curb->size, log_str, log_str_len);
 	curb->size += log_str_len;
 	pthread_cond_signal(&g_asynclog->m_cond);
@@ -78,6 +104,7 @@ fail:
 	printf("failed to put %s into buffer\n", log_str);
 out:
 	pthread_mutex_unlock(&g_asynclog->m_mutex);
+	//shmdt(g_asynclog->buffer.datas);
 }
 
 static struct timespec *get_abstime() {
@@ -133,8 +160,9 @@ static void *worker(void *arg) {
 			memcpy(data, curb->data, curb->size);
 			data_size = curb->size;
 			curb->size = 0;
-			free(curb->data);
-			curb->data = NULL;
+			memset(curb->data, 0, kLargeBuffer);
+			//free(curb->data);
+			//curb->data = NULL;
 		}
 		pthread_mutex_unlock(&g_asynclog->m_mutex);
 		if(data != NULL && data_size > 0) {
@@ -148,10 +176,13 @@ static void *worker(void *arg) {
 		data_size = g_asynclog->buffer.datas[i].size;
 		if(data != NULL && data_size > 0) {
 			log_flush(data, data_size);
-			free(data);
+			//free(data);
 			data_size = 0;
+			memset(curb->data, 0, kLargeBuffer);
 		}
 	}
+	shmdt(g_asynclog->buffer.datas);
+	shmctl(g_asynclog->shm_id, IPC_RMID, NULL);
 }
 
 void start() {

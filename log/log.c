@@ -26,7 +26,8 @@ logger *get_g_logger() {
 }
 
 static void log_write(char *buf, int len) {
-	get_g_asynclog()->append(buf, len);
+	asynclog *g_asynclog = get_g_asynclog();
+	g_asynclog->append(buf, len);
 }
 
 static char *format_time(int level) {
