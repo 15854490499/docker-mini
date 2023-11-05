@@ -27,7 +27,6 @@ int main(int argc, char** argv) {
 		printf("command parameters init err\n");
 		return -1;
 	}
-
 	ret = parse_command_parameters(cmd, argc, argv);
 	if(ret != 0) {
 		printf("parse command parameters err\n");

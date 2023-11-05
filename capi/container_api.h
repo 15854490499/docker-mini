@@ -5,12 +5,18 @@
 extern "C" {
 #endif
 
+#define runtime_dir "/var/lib/docker-mini/runtime"
+#define RUNTIME_JSON "runtime.json"
+#define CGROUP_ROOT "/sys/fs/cgroup"
+
 typedef struct {
 	char *id;
 
 	char *rootfs;
 
 	char *image;
+
+	char *container_spec;
 
 } container_create_request;
 

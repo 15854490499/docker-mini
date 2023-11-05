@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <libgen.h>
 
 #include "utils.h"
 #include "storage.h"
@@ -108,6 +109,9 @@ int container_create(const container_create_request *request, container_create_r
 	char *image_name = NULL;
 	char *name = NULL;
 	char *id = NULL;
+	char *container_spec = NULL;
+	char spec_path[PATH_MAX] = { 0x00 };
+	char spec_dir[PATH_MAX] = { 0x00 };
 
 	if(resp == NULL) {
 		LOG_ERROR("resp is NULL\n");
@@ -132,8 +136,27 @@ int container_create(const container_create_request *request, container_create_r
 		LOG_ERROR("Can not create container %s rootfs layer\n", id);
 		goto out;
 	}
-	
-	LOG_ERROR("create container %s success\n", id);
+
+	container_spec = request->container_spec;
+	ret = snprintf(spec_path, sizeof(spec_path), "%s/%s/%s", runtime_dir, id, RUNTIME_JSON);
+	if(ret < 0 || ret >= sizeof(spec_path))  {
+		LOG_ERROR("Failed to get runtime path by id : %s", id);
+		return -1;
+	}
+
+	strcpy(spec_dir, spec_path);
+	ret = mkdir_p(dirname(spec_dir), 0700);
+	if(ret < 0) {
+		LOG_ERROR("Failed to create runtime directory %s.", spec_path);
+		return -1;
+	}
+	if(write_file(spec_path, container_spec, strlen(container_spec), 0666) != 0) {
+		LOG_ERROR("Failed to save spec json file");
+		ret = -1;
+		goto out;
+	}
+
+	LOG_INFO("create container %s success", id);
 out:
 	if(ret != 0)
 		(*resp)->errmsg = strdup_s("error create image");

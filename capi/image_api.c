@@ -154,7 +154,7 @@ out:
 
 static int oci_delete_rf(const im_delete_rootfs_request *request) {
 	if(request == NULL) {
-		LOG_ERROR("Request is NULL\n");
+		LOG_ERROR("Request is NULL");
 		return -1;
 	}
 

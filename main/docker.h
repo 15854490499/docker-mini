@@ -20,7 +20,15 @@
 
 namespace docker {
 
+typedef struct CreateRequest {
+	std::string container_id;
+	std::string rootfs;
+	std::string image;
+	std::string container_spec;
+} CreateRequest;
+
 typedef struct container_config {
+	std::string container_id;
 	std::string host_name;
 	std::string root_dir;
 	std::string ip;
@@ -52,13 +60,11 @@ private:
 	void set_rootdir();
 	void set_procsys();
 	void set_network();
+	void set_cgroup();
 public:
 	container(/*container_config &config*/);
-	~container() {
-		lxc_netdev_delete_by_name(veth1);
-		lxc_netdev_delete_by_name(veth2);
-	}
-	void create(const std::string container_id, const std::string rootfs, const std::string image);
+	~container() { }
+	void create(const CreateRequest *req);
 	void remove(const std::string container_id);
 	void start(const std::string container_id);
 };
