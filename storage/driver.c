@@ -455,7 +455,6 @@ int graphdriver_init() {
 		goto out;
 	}
 	g_driver.overlay_opts = overlay_opts;
-
 	ret = overlay2_create_home_directory(driver_home);
 	if(ret != 0) {
 		return -1;

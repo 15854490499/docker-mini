@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <sys/mman.h>
 #include <assert.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -15,7 +16,6 @@ static pthread_once_t once_control_ = PTHREAD_ONCE_INIT;
 static asynclog *g_asynclog;
 static bool running_ = false;
 static pthread_t tid; 
-static pthread_mutex_t mutex;
 static pthread_mutexattr_t mutexattr;
 static pthread_condattr_t condattr;
 
@@ -28,6 +28,7 @@ void once_init() {
 	g_asynclog->start = start;
 	g_asynclog->append = append;
 	g_asynclog->stop = stop;
+#ifdef REBASETOFILE
 	g_asynclog->filename = NULL;
     time_t t = time(NULL);
     struct tm *sys_tm = localtime(&t);
@@ -39,58 +40,98 @@ void once_init() {
 		exit(1);
 	}
 	g_asynclog->filename = strdup_s(log_full_name);
-	pthread_mutexattr_setpshared(&mutexattr, PTHREAD_PROCESS_SHARED);
-	pthread_condattr_setpshared(&condattr, PTHREAD_PROCESS_SHARED);
-	pthread_mutex_init(&mutex, &mutexattr);
-	pthread_mutex_init(&g_asynclog->m_mutex, &mutexattr);
-	pthread_cond_init(&g_asynclog->m_cond, &condattr);
-	open(shm_file, O_CREAT | O_RDWR, 0666);
-	key_t shm_key = ftok(shm_file, 1);
-	g_asynclog->buffer.buffer_size = 6;
-	g_asynclog->shm_id = shmget(shm_key, sizeof(buffer_item) * g_asynclog->buffer.buffer_size, IPC_CREAT);
-	if(g_asynclog->shm_id < 0) {
-		printf("obtain shared memory failed : %s\n", strerror(errno));
-		goto err_out;
+#endif
+	g_asynclog->buffer.buffer_size = 4;
+	
+	g_asynclog->datas_file_id = open(datas_file, O_CREAT | O_RDWR, 0666);
+	if(g_asynclog->datas_file_id == -1) {
+		printf("open %s failed\n", datas_file);
+		exit(1);
 	}
-	g_asynclog->buffer.datas = (buffer_item*)shmat(g_asynclog->shm_id, NULL, 0);//common_calloc_s(sizeof(buffer_item) * 16);
-	if(g_asynclog->buffer.datas == -1) {
+
+#ifdef DAEMON_COMPILE
+	ftruncate(g_asynclog->datas_file_id, sizeof(buffer_item) * g_asynclog->buffer.buffer_size);
+#endif
+
+	g_asynclog->buffer.datas = (buffer_item*)mmap(NULL, sizeof(buffer_item) * g_asynclog->buffer.buffer_size, PROT_READ|PROT_WRITE, MAP_SHARED, g_asynclog->datas_file_id, 0);
+	if(g_asynclog->buffer.datas == MAP_FAILED) {
 		printf("attach shared memory to %d failed : %s\n", getpid(), strerror(errno));
 		goto err_out;
 	}
+
+#ifdef DAEMON_COMPILE
 	memset(g_asynclog->buffer.datas, 0, sizeof(buffer_item) * g_asynclog->buffer.buffer_size);
-	g_asynclog->buffer.pput = 0;
-	g_asynclog->buffer.pget = 0;
+#endif
+
+	g_asynclog->sharedomain_file_id = open(sharedomain_file, O_CREAT | O_RDWR, 0666);
+	if(g_asynclog->sharedomain_file_id == -1) {
+		printf("open %s failed\n", sharedomain_file);
+		exit(1);
+	}
+
+#ifdef DAEMON_COMPILE
+	ftruncate(g_asynclog->sharedomain_file_id, kSmallBuffer);
+#endif
+
+	g_asynclog->buffer.pshared_domain = (struct shared_domain*)mmap(NULL, kSmallBuffer, PROT_READ|PROT_WRITE, MAP_SHARED, g_asynclog->sharedomain_file_id, 0);
+	if(g_asynclog->buffer.pshared_domain == MAP_FAILED) {
+		printf("attach shared memory to %d failed : %s\n", getpid(), strerror(errno));
+		goto err_out;
+	}
+
+#ifdef DAEMON_COMPILE
+	memset(g_asynclog->buffer.pshared_domain, 0, kSmallBuffer);
+
+	pthread_mutexattr_setpshared(&mutexattr, PTHREAD_PROCESS_SHARED);
+	pthread_condattr_setpshared(&condattr, PTHREAD_PROCESS_SHARED);
+	pthread_mutex_init(&g_asynclog->buffer.pshared_domain->t_mutex, &mutexattr);
+	pthread_mutex_init(&g_asynclog->buffer.pshared_domain->m_mutex, &mutexattr);
+	pthread_cond_init(&g_asynclog->buffer.pshared_domain->m_cond, &condattr);
+
+	g_asynclog->buffer.pshared_domain->pput = 0;
+	g_asynclog->buffer.pshared_domain->pget = 0;
+#endif
+
 	goto out;
 
 err_out:
-	if(g_asynclog->shm_id >= 0) {
-		shmctl(g_asynclog->shm_id, IPC_RMID, NULL);
+	if(g_asynclog->datas_file_id >= 0) {
+		close(g_asynclog->datas_file_id);
+		munmap(g_asynclog->buffer.datas, sizeof(buffer_item) * g_asynclog->buffer.buffer_size);
 	}
+	if(g_asynclog->sharedomain_file_id >= 0) {
+		close(g_asynclog->sharedomain_file_id);
+		munmap(g_asynclog->buffer.pshared_domain, kSmallBuffer);
+	}
+	exit(1);
 out:
 	return;
 }
+
 asynclog *get_g_asynclog() {
 	pthread_once(&once_control_, once_init);
-	pthread_mutex_lock(&mutex);
+#ifdef DAEMON_COMPILE
+	pthread_mutex_lock(&g_asynclog->buffer.pshared_domain->t_mutex);
 	if(!running_) {
 		running_ = true;
 		g_asynclog->start();
 	}
-	pthread_mutex_unlock(&mutex);
+	pthread_mutex_unlock(&g_asynclog->buffer.pshared_domain->t_mutex);
+#endif
 	return g_asynclog;
 }
 
 void append(char *log_str, int log_str_len) {
 	buffer_item *curb = NULL;
 
-	pthread_mutex_lock(&g_asynclog->m_mutex);
-	curb = &(g_asynclog->buffer.datas[g_asynclog->buffer.pput]);
+	pthread_mutex_lock(&g_asynclog->buffer.pshared_domain->m_mutex);
+	curb = &(g_asynclog->buffer.datas[g_asynclog->buffer.pshared_domain->pput]);
 	if(curb->size + log_str_len >= kLargeBuffer) {
-		g_asynclog->buffer.pput = (g_asynclog->buffer.pput + 1) % g_asynclog->buffer.buffer_size;
- 		if(g_asynclog->buffer.pput == g_asynclog->buffer.pget) {
+		g_asynclog->buffer.pshared_domain->pput = (g_asynclog->buffer.pshared_domain->pput + 1) % g_asynclog->buffer.buffer_size;
+ 		if(g_asynclog->buffer.pshared_domain->pput == g_asynclog->buffer.pshared_domain->pget) {
 			goto fail;
 		}
-		curb = &(g_asynclog->buffer.datas[g_asynclog->buffer.pput]);
+		curb = &(g_asynclog->buffer.datas[g_asynclog->buffer.pshared_domain->pput]);
 	}
 	/*if(curb->data == NULL) {
 		curb->data = (char*)common_calloc_s(kLargeBuffer);
@@ -98,12 +139,12 @@ void append(char *log_str, int log_str_len) {
 	}*/
 	memcpy(curb->data + curb->size, log_str, log_str_len);
 	curb->size += log_str_len;
-	pthread_cond_signal(&g_asynclog->m_cond);
+	pthread_cond_signal(&g_asynclog->buffer.pshared_domain->m_cond);
 	goto out;
 fail:
 	printf("failed to put %s into buffer\n", log_str);
 out:
-	pthread_mutex_unlock(&g_asynclog->m_mutex);
+	pthread_mutex_unlock(&g_asynclog->buffer.pshared_domain->m_mutex);
 	//shmdt(g_asynclog->buffer.datas);
 }
 
@@ -120,6 +161,7 @@ static void log_flush(char *data, int data_size) {
 	if(data_size == 0) {
 		return;
 	}
+#ifdef REBASETOFILE
 	FILE *fp = fopen(g_asynclog->filename, "a+");
 	while(data_size) {
 		n = fwrite_unlocked(data + n, 1, data_size, fp);
@@ -134,6 +176,20 @@ static void log_flush(char *data, int data_size) {
 		data += n;
 	}
 	fclose(fp);
+#else
+	while(data_size) {
+		n = fwrite_unlocked(data + n, 1, data_size, stdout);
+		if(n == 0) {
+			int err = ferror(stdout);
+			if(err) {
+				fprintf(stderr, "fwrite failed\n");
+				break;
+			}
+		}
+		data_size -= n;
+		data += n;
+	}
+#endif
 }
 
 static void *worker(void *arg) {
@@ -145,15 +201,15 @@ static void *worker(void *arg) {
 
 	assert(running_ == true);
 	while(running_) {
-		pthread_mutex_lock(&g_asynclog->m_mutex);
-		if(g_asynclog->buffer.pput == g_asynclog->buffer.pget) {
+		pthread_mutex_lock(&g_asynclog->buffer.pshared_domain->m_mutex);
+		if(g_asynclog->buffer.pshared_domain->pput == g_asynclog->buffer.pshared_domain->pget) {
 			abstime = get_abstime();
-			pthread_cond_timedwait(&g_asynclog->m_cond, &g_asynclog->m_mutex, abstime);
+			pthread_cond_timedwait(&g_asynclog->buffer.pshared_domain->m_cond, &g_asynclog->buffer.pshared_domain->m_mutex, abstime);
 			free(abstime);
-			curb = &(g_asynclog->buffer.datas[g_asynclog->buffer.pget]);
+			curb = &(g_asynclog->buffer.datas[g_asynclog->buffer.pshared_domain->pget]);
 		} else {
-			curb = &(g_asynclog->buffer.datas[g_asynclog->buffer.pget]);
-			g_asynclog->buffer.pget = (g_asynclog->buffer.pget + 1) % g_asynclog->buffer.buffer_size;
+			curb = &(g_asynclog->buffer.datas[g_asynclog->buffer.pshared_domain->pget]);
+			g_asynclog->buffer.pshared_domain->pget = (g_asynclog->buffer.pshared_domain->pget + 1) % g_asynclog->buffer.buffer_size;
 		}
 		if(curb->data != NULL && curb->size > 0) {
 			data = calloc_s(1, curb->size);
@@ -164,11 +220,12 @@ static void *worker(void *arg) {
 			//free(curb->data);
 			//curb->data = NULL;
 		}
-		pthread_mutex_unlock(&g_asynclog->m_mutex);
+		pthread_mutex_unlock(&g_asynclog->buffer.pshared_domain->m_mutex);
 		if(data != NULL && data_size > 0) {
 			log_flush(data, data_size);
 			free(data);
 			data_size = 0;
+			data = NULL;
 		}
 	}
 	for(i = 0; i < g_asynclog->buffer.buffer_size; i++) {
@@ -181,8 +238,12 @@ static void *worker(void *arg) {
 			memset(curb->data, 0, kLargeBuffer);
 		}
 	}
-	shmdt(g_asynclog->buffer.datas);
-	shmctl(g_asynclog->shm_id, IPC_RMID, NULL);
+	
+	close(g_asynclog->datas_file_id);
+	munmap(g_asynclog->buffer.datas, sizeof(buffer_item) * g_asynclog->buffer.buffer_size);
+	
+	close(g_asynclog->sharedomain_file_id);
+	munmap(g_asynclog->buffer.pshared_domain, kSmallBuffer);
 }
 
 void start() {

@@ -29,26 +29,42 @@ typedef struct {
 typedef struct {
 	char *id;
 
-	bool force; 
-} container_delete_request;
+} container_start_request;
 
 typedef struct {
 	char *id;
 
-	uint32_t exit_status;
+	char *errmsg;
+} container_start_response;
+
+typedef struct {
+	char *id;
+
+	bool force; 
+} container_remove_request;
+
+typedef struct {
+	char *id;
+
+	unsigned int exit_status;
 
 	char *errmsg;
-} container_delete_response;
+} container_remove_response;
 
+#ifdef DAEMON_COMPILE
 int container_create(const container_create_request *request, container_create_response **response);
-int container_delete(const container_delete_request *request, container_delete_response **response);
+int container_start(const container_start_request *request, container_start_response **response);
+int container_remove(const container_remove_request *request, container_remove_response **response);
 char *container_get_mount_point(const char *container_id);
 void container_umount_point(const char *container_id);
+#endif
 
 void free_container_create_request(container_create_request *req);
 void free_container_create_response(container_create_response *resp);
-void free_container_delete_request(container_delete_request *req);
-void free_container_delete_response(container_delete_response *resp);
+void free_container_start_request(container_start_request *req);
+void free_container_start_response(container_start_response *resp);
+void free_container_remove_request(container_remove_request *req);
+void free_container_remove_response(container_remove_response *resp);
 #ifdef __cplusplus
 }
 #endif

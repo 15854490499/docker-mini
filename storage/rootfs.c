@@ -331,6 +331,7 @@ static int remove_rootfs_from_memory(char *id) {
 		if(strcmp(item->next->rootfs_id, id) == 0) {
 			break;
 		}
+		item = item->next;
 	}
 	if(item->next == NULL) {
 		return -1;
@@ -618,22 +619,22 @@ static int rootfs_store_load() {
 
 	ret = list_all_subdir(g_rootfs_store->dir, &container_dirs, &container_dirs_num);
 	if(ret != 0) {
-		LOG_ERROR("Failed to get container directories\n");
+		LOG_ERROR("Failed to get container directories");
 		goto out;
 	}
 
 	for(i = 0; i < container_dirs_num; i++) {
-		LOG_INFO("Restore the containers:%s\n", container_dirs[0]);
+		LOG_INFO("Restore the containers:%s", container_dirs[i]);
 		nret = snprintf(container_path, sizeof(container_path), "%s/%s", g_rootfs_store->dir, container_dirs[i]);
 		if(nret < 0 || (size_t)nret >= sizeof(container_path)) {
-			LOG_ERROR("Failed to get container path\n");
+			LOG_ERROR("Failed to get container path");
 			continue;
 		}
 		append_ret = append_container_by_directory(container_path);
 		if(append_ret != 0) {
-			LOG_INFO("Found container path but load failed: %s, deleting...\n", container_path);
+			LOG_INFO("Found container path but load failed: %s, deleting...", container_path);
 			if(recursive_rmdir(container_path, 0) != 0) {
-				LOG_ERROR("Failed to delete rootfs directory : %s\n", container_path);
+				LOG_ERROR("Failed to delete rootfs directory : %s", container_path);
 			}
 			continue;
 		}

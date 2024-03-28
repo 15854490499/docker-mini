@@ -6,6 +6,8 @@
 #include "utils.h"
 #include "log.h"
 
+#ifdef DAEMON_COMPILE
+
 int oci_init() {
 	int ret = 0;
 	
@@ -173,7 +175,7 @@ static char *oci_resolve_image_name(const char *name) {
 	return oci_normalize_image_name(name);
 }
 
-static int oci_rm_image(const im_rmi_request *request) {
+static int oci_rm_image(const im_remove_request *request) {
 	int ret = 0;
 	char *image_id = NULL;
 	char *real_image_name = NULL;
@@ -345,7 +347,7 @@ out:
 	return ret;
 }
 
-int im_rm_image(const im_rmi_request *request, im_remove_response **response) {
+int im_rm_image(const im_remove_request *request, im_remove_response **response) {
 	int ret = -1;
 	char *image_ref = NULL;
 	
@@ -382,6 +384,8 @@ pack_response:
 	free(image_ref);
 	return ret;
 }
+
+#endif
 
 void free_im_pull_request(im_pull_request *req)
 {
@@ -460,7 +464,7 @@ void free_im_delete_rootfs_request(im_delete_rootfs_request *request) {
 	free(request);
 }
 
-void free_im_rmi_request(im_rmi_request *request) {
+void free_im_remove_request(im_remove_request *request) {
 	if(request == NULL) {
 		return;
 	}

@@ -20,13 +20,6 @@
 
 namespace docker {
 
-typedef struct CreateRequest {
-	std::string container_id;
-	std::string rootfs;
-	std::string image;
-	std::string container_spec;
-} CreateRequest;
-
 typedef struct container_config {
 	std::string container_id;
 	std::string host_name;
@@ -35,15 +28,6 @@ typedef struct container_config {
 	std::string bridge_name;
 	std::string bridge_ip;
 } container_config;
-
-class ImageManager {
-public:
-	ImageManager();
-	virtual ~ImageManager() {};
-	
-	std::string PullImage(const std::string image);
-	void RemoveImage(const std::string image);
-};
 
 class container {
 private:
@@ -64,8 +48,6 @@ private:
 public:
 	container(/*container_config &config*/);
 	~container() { }
-	void create(const CreateRequest *req);
-	void remove(const std::string container_id);
 	void start(const std::string container_id);
 };
 

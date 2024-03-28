@@ -914,7 +914,6 @@ int layer_store_init() {
 		g_metadata->layer_list->next = NULL;
 		g_metadata->layer_list_len = 0;
 	}
-
 	nret = mkdir_p(g_root_dir, 0600);
 	if(nret != 0) {
 		LOG_ERROR("build root dir of layer store failed\n");

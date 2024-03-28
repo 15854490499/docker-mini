@@ -1441,18 +1441,18 @@ static int set_config(pull_descriptor* desc, char* image_id) {
 	int ret = 0;
 	char* config_str = NULL;
 	if(desc == NULL) {
-		LOG_ERROR("Invalid NULL pointer\n");
+		LOG_ERROR("Invalid NULL pointer");
 		return -1;
 	}
 	config_str = read_text_file(desc->config.file);
 	if(config_str == NULL) {
-		LOG_ERROR("read file %s content failed\n", desc->config.file);
+		LOG_ERROR("read file %s content failed", desc->config.file);
 		ret = -1;
 		goto out;
 	}
 	ret = storage_img_set_big_data(image_id, desc->config.digest, config_str);
 	if(ret != 0) {
-		LOG_ERROR("set big data failed\n");
+		LOG_ERROR("set big data failed");
 		goto out;
 	}
 out:
@@ -1469,7 +1469,7 @@ static int create_image(pull_descriptor* desc, char* image_id, bool* reuse) {
 	char* pre_top_layer = NULL;
 	
 	if(image_id == NULL || reuse == NULL) {
-		LOG_ERROR("invalid NULL pointer\n");
+		LOG_ERROR("invalid NULL pointer");
 		return -1;
 	}
 	top_layer_index = desc->layers_len - 1;
@@ -1483,12 +1483,12 @@ static int create_image(pull_descriptor* desc, char* image_id, bool* reuse) {
 	*reuse = false;
 	ret = storage_img_create(image_id, top_layer_id, NULL, &opts);
 	if(ret != 0) {
-		LOG_ERROR("storage_img_create err!\n");
+		LOG_ERROR("storage_img_create err!");
 		goto out;
 	}
 	ret = image_store_add_name(image_id, desc->dest_image_name);
 	if(ret != 0) {
-		LOG_ERROR("add image name failed\n");
+		LOG_ERROR("add image name failed");
 		goto out;
 	}
 
@@ -1502,7 +1502,7 @@ static int register_image(pull_descriptor* desc) {
 	bool image_created = false;
 	bool reuse = false;
 	if(desc == NULL) {
-		LOG_ERROR("invalid NULL pointer\n");
+		LOG_ERROR("invalid NULL pointer");
 		return -1;
 	}
 	image_id = (char*)without_sha256_prefix(desc->config.digest);
@@ -1511,38 +1511,38 @@ static int register_image(pull_descriptor* desc) {
 	}
 	ret = create_image(desc, image_id, &reuse);
 	if(ret != 0) {
-		LOG_ERROR("create image %s failed\n", desc->image_name);
+		LOG_ERROR("create image %s failed", desc->image_name);
 		goto out;
 	}
 	desc->rollback_layers_on_failure = false;
 	image_created = true;
 	ret = set_config(desc, image_id);
 	if(ret != 0) {
-		LOG_ERROR("set image config for image %s failed\n", desc->image_name);
+		LOG_ERROR("set image config for image %s failed", desc->image_name);
 		goto out;
 	}
 	ret = set_manifest(desc, image_id);
 	if(ret != 0) {
-		LOG_ERROR("set manifest for image %s failed\n", desc->image_name);
+		LOG_ERROR("set manifest for image %s failed", desc->image_name);
 		goto out;
 	}
 	ret = set_loaded_time(desc, image_id);
 	if(ret != 0) {
-		LOG_ERROR("set loaded time for image %s failed\n", desc->image_name);
+		LOG_ERROR("set loaded time for image %s failed", desc->image_name);
 		goto out;
 	}
 	ret = storage_img_set_image_size(image_id);
 	if(ret != 0) {
-		LOG_ERROR("set image size failed for %s failed\n", desc->image_name);
+		LOG_ERROR("set image size failed for %s failed", desc->image_name);
 		goto out;
 	}
 out:
 	if(ret != 0 && image_created) {
 		if(storage_img_delete(image_id, true)) {
-			LOG_ERROR("delete image %s failed\n", image_id);
+			LOG_ERROR("delete image %s failed", image_id);
 		}
 	} else {
-		LOG_INFO("created img with id %s\n", image_id);
+		LOG_INFO("created img with id %s", image_id);
 	}
 	return ret;
 }

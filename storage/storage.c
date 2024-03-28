@@ -42,25 +42,25 @@ static int try_fill_image_spec(image_t* img, const char* id, const char* image_s
 		return -1;
 	sha256_key = calc_full_digest(id);
 	if(sha256_key == NULL) {
-		LOG_ERROR("Failed to get sha256 key\n");
+		LOG_ERROR("Failed to get sha256 key");
 		return -1;
 	}
 	base_name = make_big_data_base_name(sha256_key);
 	if(base_name == NULL) {
-		LOG_ERROR("Failed to retrieve oci image spec file's base name\n'");
+		LOG_ERROR("Failed to retrieve oci image spec file's base name'");
 		ret = -1;
 		goto out;
 	}
 
 	nret = sprintf(config_file, "%s/%s/%s", image_store_dir, id, base_name);
 	if(nret < 0 || nret > PATH_MAX) {
-		LOG_ERROR("Failed to retrieve oci image spac file\n");
+		LOG_ERROR("Failed to retrieve oci image spac file");
 		ret = -1;
 		goto out;
 	}
 	img->spec = storage_spec_parse_file(config_file, NULL, &err);
 	if(img->spec == NULL) {
-		LOG_ERROR("Failed to parse oci image spec : %s\n", err != NULL ? (char*)err : " ");
+		LOG_ERROR("Failed to parse oci image spec : %s", err != NULL ? (char*)err : " ");
 		ret = -1;
 		goto out;
 	}
@@ -75,26 +75,26 @@ static int save_image(storage_storage* img) {
 	char image_path[PATH_MAX] = { 0x00 };
 	char image_dir[PATH_MAX] = { 0x00 };
 	parser_error err = NULL;
-	char* json_data = NULL;
+	char *json_data = NULL;
 
 	ret = snprintf(image_path, sizeof(image_path), "%s/%s/%s", storage_dir, img->id, IMAGE_JSON);
 	if(ret < 0 || ret >= sizeof(image_path))  {
-		LOG_ERROR("Failed to get image path by id : %s\n", img->id);
+		LOG_ERROR("Failed to get image path by id : %s", img->id);
 		return -1;
 	}
 	strcpy(image_dir, image_path);
 	ret = mkdir_p(dirname(image_dir), 0700);
 	if(ret < 0) {
-		LOG_ERROR("Failed to create image directory %s.\n", image_path);
+		LOG_ERROR("Failed to create image directory %s.", image_path);
 		return -1;
 	}
 	json_data = storage_storage_generate_json(img, NULL, &err);
 	if(json_data == NULL) {
-		LOG_ERROR("Failed to generate image json path string:%s\n", err ? err : " ");
+		LOG_ERROR("Failed to generate image json path string:%s", err ? err : " ");
 		ret = -1;
 	}
 	if(write_file(image_path, json_data, strlen(json_data), 0600) != 0) {
-		LOG_ERROR("Failed to save image json file\n");
+		LOG_ERROR("Failed to save image json file");
 		ret = -1;
 		goto out;
 	}
@@ -106,7 +106,7 @@ out:
 
 int append_name(char*** names, size_t* names_len, const char* name) {
 	size_t new_size, old_size;
-	char** tmp_names = NULL;
+	char **tmp_names = NULL;
 
 	if(name == NULL) {
 		return 0;
@@ -150,7 +150,7 @@ image_t *delete_image(const char *id) {
 		elem = elem->next;
 	}
 	if(elem->next == NULL) {
-		LOG_ERROR("img %s not found\n", id);
+		LOG_ERROR("img %s not found", id);
 		return NULL;
 	}
 	
@@ -190,7 +190,7 @@ static image_t* lookup(const char* img_id) {
 	}
 
 	if(elem == NULL) {
-		LOG_ERROR("img %s not found!\n", img_id);
+		LOG_ERROR("img %s not found!", img_id);
 		goto out;
 	}
 
@@ -217,14 +217,14 @@ static image_summary *get_summary(const char *img_id) {
 
 	info = common_calloc_s(sizeof(image_summary));
 	if(info == NULL) {
-		LOG_ERROR("Out of memory\n");
+		LOG_ERROR("Out of memory");
 		ret = -1;
 		goto out;
 	}
 	
 	img = lookup(img_id);
 	if(img == NULL) {
-		LOG_ERROR("Failed to get img\n");
+		LOG_ERROR("Failed to get img");
 		ret = -1;
 		goto out;
 	}
@@ -249,7 +249,7 @@ image_summary *storage_img_get_summary(const char *img_id) {
 	image_summary *image_summary = NULL;
 
 	if(img_id == NULL) {
-		LOG_ERROR("Invalid argumentx for image get summary\n");
+		LOG_ERROR("Invalid arguments for image get summary");
 		return NULL;
 	}
 
@@ -279,7 +279,7 @@ int storage_img_get_names(const char *image_name, char ***names, size_t *names_l
 	image_t *img;
 
 	if(image_name == NULL) {
-		LOG_ERROR("invalid NULL pointer\n");
+		LOG_ERROR("invalid NULL pointer");
 		return -1;
 	}
 
@@ -298,7 +298,7 @@ char *storage_img_get_image_id(const char *image_name) {
 	image_t *img;
 
 	if(image_name == NULL) {
-		LOG_ERROR("invalid NULL pointer\n");
+		LOG_ERROR("invalid NULL pointer");
 		return NULL;
 	}
 
@@ -321,12 +321,12 @@ int image_store_add_name(const char *id, const char *name) {
 	size_t i;
 
 	if(id == NULL || name == NULL) {
-		LOG_ERROR("Invalid input parameter : %s, %s\n", id, name);
+		LOG_ERROR("Invalid input parameter : %s, %s", id, name);
 		return -1;
 	}
 
 	if(g_image_store == NULL) {
-		LOG_ERROR("Image store is not ready\n");
+		LOG_ERROR("Image store is not ready");
 		return -1;
 	}
 
@@ -337,13 +337,13 @@ int image_store_add_name(const char *id, const char *name) {
 	}
 	
 	if(dup_array_of_strings((const char**)img->simage->names, img->simage->names_len, &names, &names_len) != 0) {
-		LOG_ERROR("Out of memory\n");
+		LOG_ERROR("Out of memory");
 		ret = -1;
 		goto out;
 	}
 
 	if(append_name(&names, &names_len, name) != 0) {
-		LOG_ERROR("Out of memory\n");
+		LOG_ERROR("Out of memory");
 		ret = -1;
 		goto out;
 	}
@@ -352,7 +352,7 @@ int image_store_add_name(const char *id, const char *name) {
 	img->simage->names_len = names_len;
 
 	if(save_image(img->simage) != 0) {
-		LOG_ERROR("Failed to update image\n");
+		LOG_ERROR("Failed to update image");
 		ret = -1;
 		goto out;
 	}
@@ -374,19 +374,19 @@ static int get_data_path(const char* id, const char* key, char* path, size_t len
 
 	data_base_name = make_big_data_base_name(key);
 	if(data_base_name == NULL) {
-		LOG_ERROR("Failed to make big data base name\n");
+		LOG_ERROR("Failed to make big data base name");
 		return -1;
 	}
 
 	if(get_data_dir(id, data_dir, sizeof(data_dir)) != 0) {
-		LOG_ERROR("Failed to get image data dir: %s\n", id);
+		LOG_ERROR("Failed to get image data dir: %s", id);
 		ret = -1;
 		goto out;
 	}
 
 	nret = snprintf(path, len, "%s/%s", data_dir, data_base_name);
 	if(nret < 0 || (size_t)nret >= len) {
-		LOG_ERROR("Failed to get big data base path\n");
+		LOG_ERROR("Failed to get big data base path");
 		ret = -1;
 		goto out;
 	}
@@ -643,21 +643,21 @@ static int get_big_data_names(const char *id, char ***names, size_t *names_len) 
 	int ret = 0;
 	image_t *img = NULL;
 	if(id == NULL) {
-		LOG_ERROR("Invalid parameter, id is NULL\n");
+		LOG_ERROR("Invalid parameter, id is NULL");
 		return -1;
 	}
 	if(g_image_store == NULL) {
-		LOG_ERROR("Image store is not ready\n");
+		LOG_ERROR("Image store is not ready");
 		return -1;
 	}
 	img = lookup(id);
 	if(img == NULL) {
-		LOG_ERROR("Image not known\n");
+		LOG_ERROR("Image not known");
 		ret = -1;
 		goto out;
 	}
 	if(dup_array_of_strings((const char**)img->simage->big_data_names, img->simage->big_data_names_len, names, names_len) != 0) {
-		LOG_ERROR("Failed to dup images's names\n'");
+		LOG_ERROR("Failed to dup images's names");
 		ret = -1;
 		goto out;
 	}
@@ -675,12 +675,12 @@ static int set_big_data(const char* id, const char* key, const char* data) {
 	bool save = false;
 
 	if(key == NULL || strlen(key) == 0) {
-		LOG_ERROR("invalid empty key\n");
+		LOG_ERROR("invalid empty key");
 		return -1;
 	}
 
 	if(g_image_store == NULL) {
-		LOG_ERROR("Image store is not ready\n");
+		LOG_ERROR("Image store is not ready");
 		ret = -1;
 		goto out;
 	}
@@ -688,14 +688,14 @@ static int set_big_data(const char* id, const char* key, const char* data) {
 	img = lookup(id);
 	//printf("%s\n", img->simage->names[0]);
 	if(img == NULL) {
-		LOG_ERROR("Failed to lookup image from store\n");
+		LOG_ERROR("Failed to lookup image from store");
 		ret = -1;
 		goto out;
 	}
 	image_id = img->simage->id;
 
 	if(get_data_dir(image_id, image_dir, sizeof(image_dir)) != 0) {
-		LOG_ERROR("Failed to get image data dir: %s\n", id);
+		LOG_ERROR("Failed to get image data dir: %s", id);
 		ret = -1;
 		goto out;
 	}
@@ -703,24 +703,24 @@ static int set_big_data(const char* id, const char* key, const char* data) {
 	ret = mkdir_p(image_dir, 0600);
 	
 	if(ret < 0) {
-		LOG_ERROR("Unable to create directory %s.\n", image_dir);
+		LOG_ERROR("Unable to create directory %s.", image_dir);
 		ret = -1;
 		goto out;
 	}
 	
 	if(get_data_path(image_id, key,  big_data_file, sizeof(big_data_file)) != 0) {
-		LOG_ERROR("Failed to get big data file path: %s\n", key);
+		LOG_ERROR("Failed to get big data file path: %s", key);
 		ret = -1;
 		goto out;
 	}
 	
 	if(write_file(big_data_file, data, strlen(data), 0600)) {
-		LOG_ERROR("Failed to save big data file: %s\n", big_data_file);
+		LOG_ERROR("Failed to save big data file: %s", big_data_file);
 		ret = -1;
 		goto out;
 	}
 	if(update_image_with_big_data(img, key, data, &save) != 0) {
-		LOG_ERROR("Failed to update image big data\n");
+		LOG_ERROR("Failed to update image big data");
 		ret = -1;
 		goto out;
 	}
@@ -728,7 +728,7 @@ static int set_big_data(const char* id, const char* key, const char* data) {
 		try_fill_image_spec(img, image_id, g_image_store->dir);
 	}
 	if(save && save_image(img->simage) != 0) {
-		LOG_ERROR("Failed to complete persistence to disk\n");
+		LOG_ERROR("Failed to complete persistence to disk");
 		ret = -1;
 		goto out;
 	}
@@ -782,17 +782,17 @@ static int64_t get_big_data_size(const char *id, const char *key)
     int64_t size = -1;
 
     if (id == NULL) {
-    	LOG_ERROR("Invalid parameter, id is NULL\n");
+    	LOG_ERROR("Invalid parameter, id is NULL");
         return -1;
     }    
 
     if (key == NULL || strlen(key) == 0) { 
-    	LOG_ERROR("Not a valid name for a big data item, can't retrieve image big data value for empty name\n");
+    	LOG_ERROR("Not a valid name for a big data item, can't retrieve image big data value for empty name");
         return -1;
     }    
 
     if (g_image_store == NULL) {
-    	LOG_ERROR("Image store is not ready\n");
+    	LOG_ERROR("Image store is not ready");
         return -1;
     }    
 
@@ -1158,7 +1158,7 @@ int storage_img_create(const char *id, const char *parent_id, const char *metada
 	size_t unique_names_len = 0;
 	char* searchable_digest = opts->digest;
 	char timebuffer[TIME_STR_SIZE] = { 0x00 };
-	image_t* img = NULL;
+	image_t *img = NULL;
 	storage_storage* im = NULL;
 
 	if(id == NULL || opts == NULL) {
@@ -1537,25 +1537,25 @@ int storage_rootfs_delete(const char *container_id) {
 	storage_rootfs *rootfs_info = NULL;
 
 	if(container_id == NULL) {
-		LOG_ERROR("Invalid input arguments\n");
+		LOG_ERROR("Invalid input arguments");
 		return -1;
 	}
 	
 	rootfs_info = rootfs_store_get_rootfs(container_id);
 	if(rootfs_info == NULL) {
-		LOG_ERROR("Failed to get rootfs %s info\n", container_id);
+		LOG_ERROR("Failed to get rootfs %s info", container_id);
 		ret = -1;
 		goto out;
 	}
 
 	if(layer_store_delete(rootfs_info->layer) != 0) {
-		LOG_ERROR("Failed to remove layer %s\n", rootfs_info->layer);
+		LOG_ERROR("Failed to remove layer %s", rootfs_info->layer);
 		ret = -1;
 		return ret;
 	}
 
 	if(delete_rootfs_from_store(container_id) != 0) {
-		LOG_ERROR("Failed to remove rootfs %s\n", container_id);
+		LOG_ERROR("Failed to remove rootfs %s", container_id);
 		ret = -1;
 		goto out;
 	}
@@ -1576,13 +1576,13 @@ char *storage_rootfs_mount(const char *container_id)
 
     rootfs_info = rootfs_store_get_rootfs(container_id);
     if (rootfs_info == NULL) {
-    	LOG_ERROR("Failed to get rootfs %s info\n", container_id);
+    	LOG_ERROR("Failed to get rootfs %s info", container_id);
         goto out; 
     }    
 
     mount_point = layer_store_mount(rootfs_info->layer);
     if (mount_point == NULL) {
-    	LOG_ERROR("Failed to mount %s\n", rootfs_info->layer);
+    	LOG_ERROR("Failed to mount %s", rootfs_info->layer);
         goto out; 
     }    
 
@@ -1596,20 +1596,20 @@ int storage_rootfs_umount(const char *container_id, bool force) {
 	storage_rootfs *rootfs_info = NULL;
 
 	if(container_id == NULL) {
-		LOG_ERROR("Invalid input arguments\n");
+		LOG_ERROR("Invalid input arguments");
 		ret = -1;
 		goto out;
 	}
 
 	rootfs_info = rootfs_store_get_rootfs(container_id);
 	if(rootfs_info == NULL) {
-		LOG_ERROR("Failed to get rootfs %s info, skip umount\n", container_id);
+		LOG_ERROR("Failed to get rootfs %s info, skip umount", container_id);
 		ret == 0;
 		goto out;
 	}
 
 	if(layer_store_umount(rootfs_info->layer, force) != 0) {
-		LOG_ERROR("Failed to umount layer %s\n", rootfs_info->layer);
+		LOG_ERROR("Failed to umount layer %s", rootfs_info->layer);
 		ret = -1;
 		goto out;
 	}
@@ -1645,7 +1645,7 @@ int umount_point(const char *container_id) {
 
 	ret = storage_rootfs_umount(id, true);
 	if(ret != 0) {
-		LOG_ERROR("err umount rootfs\n");	
+		LOG_ERROR("err umount rootfs");	
 	}
 
 out:
@@ -1669,41 +1669,41 @@ static int with_valid_converted_config(const char *path, bool *valid)
 
     nret = snprintf(image_path, sizeof(image_path), "%s/%s", path, IMAGE_JSON);
     if (nret < 0 || (size_t)nret >= sizeof(image_path)) {
-    	LOG_ERROR("Failed to get image path\n");
+    	LOG_ERROR("Failed to get image path");
         ret = -1;
         goto out;
     }
 
     img = storage_storage_parse_file(image_path, NULL, &err);
     if (img == NULL) {
-    	LOG_ERROR("Failed to parse image json file : %s\n", err);
+    	LOG_ERROR("Failed to parse image json file : %s", err);
         ret = -1;
         goto out;
     }
 
     sha256_key = calc_full_digest(img->id);
     if (sha256_key == NULL) {
-    	LOG_ERROR("Failed to get sha256 key\n");
+    	LOG_ERROR("Failed to get sha256 key");
         ret = -1;
         goto out;
     }
 
     base_name = make_big_data_base_name(sha256_key);
     if (base_name == NULL) {
-    	LOG_ERROR("Failed to retrieve oci image spec file's base name\n");
+    	LOG_ERROR("Failed to retrieve oci image spec file's base name");
         ret = -1;
         goto out;
     }
 
     nret = snprintf(config_path, sizeof(config_path), "%s/%s", path, base_name);
     if (nret < 0 || (size_t)nret >= sizeof(config_path)) {
-    	LOG_ERROR("Failed to get big data config path\n");
+    	LOG_ERROR("Failed to get big data config path");
         ret = -1;
         goto out;
     }
 
     if (!file_exists(config_path)) {
-    	LOG_ERROR("version 1 format image\n");
+    	LOG_ERROR("version 1 format image");
         goto out;
     }
 
@@ -1711,7 +1711,7 @@ static int with_valid_converted_config(const char *path, bool *valid)
     err = NULL;
     v2_config = docker_image_config_v2_parse_file(config_path, NULL, &err);
     if (v2_config == NULL) {
-    	LOG_ERROR("Invalid config big data : %s\n", err);
+    	LOG_ERROR("Invalid config big data : %s", err);
         ret = -1;
         goto out;
     }
@@ -1740,7 +1740,7 @@ static int validate_manifest_schema_v1(const char *path, bool *valid) {
     *valid = false;
     nret = snprintf(manifest_path, sizeof(manifest_path), "%s/%s", path, IMAGE_DIGEST_BIG_DATA_KEY);
     if (nret < 0 || (size_t)nret >= sizeof(manifest_path)) {
-    	LOG_ERROR("Failed to get big data manifest path\n");
+    	LOG_ERROR("Failed to get big data manifest path");
         ret = -1;
         goto out; 
     }    
@@ -1763,13 +1763,13 @@ static int validate_manifest_schema_v1(const char *path, bool *valid) {
 
     manifest_v1 = registry_manifest_schema1_parse_file(manifest_path, NULL, &err);
     if (manifest_v1 == NULL) {
-    	LOG_ERROR("Invalid manifest format\n");
+    	LOG_ERROR("Invalid manifest format");
         ret = -1;
         goto out; 
     }    
 	
 	if(with_valid_converted_config(path, &valid_v2_config) != 0) {
-		LOG_ERROR("Failed to validate converted config\n");
+		LOG_ERROR("Failed to validate converted config");
 		ret = -1;
 		goto out;
 	}
@@ -1794,12 +1794,12 @@ static int append_image_by_directory(const char *image_dir) {
 
 	nret = snprintf(image_path, sizeof(image_path), "%s/%s", image_dir, IMAGE_JSON);
 	if(nret < 0 || (size_t)nret >= sizeof(image_path)) {
-		LOG_ERROR("Failed to get image path\n");
+		LOG_ERROR("Failed to get image path");
 		return -1;
 	}
 	im = storage_storage_parse_file(image_path, NULL, &err);
 	if(im == NULL) {
-		LOG_ERROR("Failed to parse images path : %s\n", err);
+		LOG_ERROR("Failed to parse images path : %s", err);
 		ret = -1;
 		goto out;
 	}
@@ -1809,7 +1809,7 @@ static int append_image_by_directory(const char *image_dir) {
 	img->simage = im;
 	im = NULL;
 	if(append_image(img->simage->id, img->simage->digest, img) != 0) {
-		LOG_ERROR("Failed to append image to image store!\n");
+		LOG_ERROR("Failed to append image to image store!");
 		ret = -1;
 		goto out;
 	}
@@ -1839,35 +1839,35 @@ int image_store_init() {
 	
 	ret = mkdir_p(g_image_store->dir, 0600);
 	if(ret  < 0) {
-		LOG_ERROR("Unable to create image store directory %s : %s.\n", g_image_store->dir, strerror(errno));
+		LOG_ERROR("Unable to create image store directory %s : %s.", g_image_store->dir, strerror(errno));
 		ret = -1;
 		goto out;
 	}
 
 	ret = list_all_subdir(g_image_store->dir, &image_dirs, &image_dirs_num);
 	if(ret != 0) {
-		LOG_ERROR("Failed to get images directory\n");
+		LOG_ERROR("Failed to get images directory");
 		goto out;
 	}
 
 	for(i = 0; i < image_dirs_num; i++) {
 		bool valid_v1_image = NULL;
 
-		LOG_ERROR("Restore the images:%s\n", image_dirs[i]);
+		LOG_INFO("Restore the images:%s", image_dirs[i]);
 		nret = snprintf(image_path, sizeof(image_path), "%s/%s", g_image_store->dir, image_dirs[i]);
 		if(nret < 0 || (size_t)nret >= sizeof(image_path)) {
-			LOG_ERROR("Failed to get image path\n");
+			LOG_ERROR("Failed to get image path");
 			continue;
 		}
 
 		if(validate_manifest_schema_v1(image_path, &valid_v1_image) != 0) {
-			LOG_ERROR("Failed to validate manifest schema version1 format\n");
+			LOG_ERROR("Failed to validate manifest schema version1 format");
 			continue;
 		}
 		
 		if(!valid_v1_image) {
 			if(append_image_by_directory(image_path) != 0) {
-				LOG_ERROR("Found image path but load json failed : %s\n", image_dirs[i]);
+				LOG_ERROR("Found image path but load json failed : %s", image_dirs[i]);
 				continue;
 			}
 		} else {

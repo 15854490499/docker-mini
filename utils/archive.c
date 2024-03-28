@@ -733,7 +733,7 @@ out:
 int archive_copy_oci_tar_split_and_ret_size(int src_fd, const char *dist_file, int64_t *ret_size)
 {
 	if (src_fd < 0 || dist_file == NULL || ret_size == NULL) {
-    	LOG_ERROR("Invalid arguments\n");
+    	LOG_ERROR("Invalid arguments");
         return -1;
     }
 
@@ -747,12 +747,12 @@ int archive_copy_oci_tar_split_and_ret_size(int src_fd, const char *dist_file, i
 
     // we need reset fd point to first position
     if (lseek(src_fd, 0, SEEK_SET) == -1) {
-    	LOG_ERROR("can not reposition of archive file\n");
+    	LOG_ERROR("can not reposition of archive file");
         return -1;
     }
     json_buf = buffer_alloc(entry_init_buf_size);
     if (json_buf == NULL) {
-    	LOG_ERROR("Failed to malloc output_buffer\n");
+    	LOG_ERROR("Failed to malloc output_buffer");
         return -1;
     }    
 
@@ -763,11 +763,11 @@ int archive_copy_oci_tar_split_and_ret_size(int src_fd, const char *dist_file, i
     for (;;) {
         nret = archive_read_next_header(read_a, &entry);
         if (nret == ARCHIVE_EOF) {
-        	LOG_INFO("read entry: %d\n", position);
+        	LOG_INFO("read entry: %d", position);
             break;
         }
         if (nret != ARCHIVE_OK) {
-        	LOG_ERROR("archive read header failed: %s\n", archive_error_string(read_a));
+        	LOG_ERROR("archive read header failed: %s", archive_error_string(read_a));
             goto out;
         }
         nret = archive_entry_parse(entry, read_a, position, json_buf, ret_size);
@@ -778,7 +778,7 @@ int archive_copy_oci_tar_split_and_ret_size(int src_fd, const char *dist_file, i
     }
     nret = atomic_write_file(dist_file, json_buf->contents, json_buf->bytes_used, 0644, true);
     if (nret != 0) {
-    	LOG_ERROR("save tar split failed\n");
+    	LOG_ERROR("save tar split failed");
         goto out;
     }
 	

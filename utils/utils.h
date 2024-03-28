@@ -60,7 +60,7 @@ int path_remove(const char *path);
 char *path_dir(const char *path);
 char *path_base(const char *path);
 char *clean_path(const char *path, char *realpath, size_t realpath_len);
-
+inline bool abspath(const char *str);
 //int normalized_host_os_arch(char **host_os, char **host_arch, char **host_variant);
 size_t strlncat(char* dststr, size_t size, const char* srcstr, size_t nsize);
 
@@ -81,6 +81,7 @@ int parse_byte_size_string(const char *s, int64_t *converted);
 int parse_size_int_and_float(const char *numstr, int64_t mlt, int64_t *converted);
 int safe_strtod(const char *numstr, double *converted);
 int safe_llong(const char *numstr, long long *converted);
+int safe_int(const char *numstr, int *converted);
 int generate_random_str(char *id, size_t len);
 
 int recursive_rmdir(const char *dirpath, int recursive_depth);
@@ -100,6 +101,10 @@ int gzip_z(const char *srcfile, const char *dstfile, const mode_t mode);
 char *oci_default_tag(const char *name);
 char *oci_add_host(const char *domain, const char *name);
 char *oci_normalize_image_name(const char *name);
+
+int open_devnull();
+int set_stdfds(int fd);
+int null_stdfds();
 
 #define MAX_IMAGE_NAME_LEN 72
 #define __DIGESTPattern "@[a-z0-9]+:[a-z0-9]{32,}"

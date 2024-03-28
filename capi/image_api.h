@@ -44,22 +44,24 @@ typedef struct {
 typedef struct {
 	char *image;
 	bool force;
-} im_rmi_request;
+} im_remove_request;
 
 typedef struct {
 	char *errmsg;
 } im_remove_response;
 
+#ifdef DAEMON_COMPILE
 int oci_init();
 int im_pull_image(const im_pull_request *requset, im_pull_response **response);
 int im_prepare_container_rootfs(const im_prepare_request *request, char **real_rootfs);
 int im_remove_container_rootfs(const char *container_id);
-int im_rm_image(const im_rmi_request *request, im_remove_response **response);
+int im_rm_image(const im_remove_request *request, im_remove_response **response);
+#endif
 void free_im_pull_request(im_pull_request *req);
 void free_im_pull_response(im_pull_response *resp);
 void free_im_prepare_request(im_prepare_request *req);
 void free_im_delete_rootfs_request(im_delete_rootfs_request *req);
-void free_im_rmi_request(im_rmi_request *request);
+void free_im_remove_request(im_remove_request *request);
 void free_im_remove_response(im_remove_response *response);
 
 #ifdef __cplusplus

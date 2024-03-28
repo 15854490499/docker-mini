@@ -280,6 +280,32 @@ char *path_base(const char *path)
     return result;
 }
 
+inline bool abspath(const char *str) {
+	return *str == '/';
+}
+
+int safe_int(const char *numstr, int *converted) {
+	char *err = NULL;
+	signed long int sli;
+
+	errno = 0;
+	sli = strtol(numstr, &err, 0);
+    if (errno == ERANGE && (sli == LONG_MAX || sli == LONG_MIN))
+        return -ERANGE;
+
+    if (errno != 0 && sli == 0)
+        return -EINVAL;
+
+    if (err == numstr || *err != '\0')
+        return -EINVAL;
+
+    if (sli > INT_MAX || sli < INT_MIN)
+        return -ERANGE;
+
+    *converted = (int)sli;
+	return 0;
+}
+
 int safe_llong(const char *numstr, long long *converted)
 {
     char *err_str = NULL;
@@ -316,6 +342,51 @@ int safe_strtod(const char *numstr, double *converted)
 
     *converted = ld; 
     return 0;
+}
+
+int open_devnull()
+{
+    int fd = open("/dev/null", O_RDWR);
+    if (fd < 0) 
+        SYSERROR("Can't open /dev/null");
+
+    return fd;
+}
+
+int set_stdfds(int fd)
+{
+    int ret; 
+
+    if (fd < 0) 
+        return -1;
+
+    ret = dup2(fd, STDIN_FILENO);
+    if (ret < 0) 
+        return -1;
+
+    ret = dup2(fd, STDOUT_FILENO);
+    if (ret < 0) 
+        return -1;
+
+    ret = dup2(fd, STDERR_FILENO);
+    if (ret < 0) 
+        return -1;
+
+    return 0;
+}
+
+int null_stdfds()
+{
+    int ret = -1;
+    int fd;
+
+    fd = open_devnull();
+    if (fd >= 0) {
+        ret = set_stdfds(fd);
+        close(fd);
+    }
+
+    return ret;
 }
 
 static int parse_unit_multiple(const char *unit, int64_t *mltpl) {
@@ -710,35 +781,35 @@ char* read_text_file(const char* path) {
 	FILE* filp = NULL;
 	const long max_size = 10 * 1024 * 1024;
 	if(path == NULL) {
-		LOG_ERROR("invalid NULL param\n");
+		LOG_ERROR("invalid NULL param");
 		return NULL;
 	}
 	filp = fopen(path, "r");
 	if(filp == NULL) {
-		LOG_ERROR("open file %s failed\n", path);
+		LOG_ERROR("open file %s failed", path);
 		goto err_out;
 	}
 	if(fseek(filp, 0, SEEK_END)) {
-		LOG_ERROR("Seek end failed\n");
+		LOG_ERROR("Seek end failed");
 		goto err_out;
 	}
 	len = ftell(filp);
 	if(len > max_size) {
-		LOG_ERROR("File too large\n");
+		LOG_ERROR("File too large");
 		goto err_out;
 	}
 	if(fseek(filp, 0, SEEK_SET)) {
-		LOG_ERROR("Seek set failed\n");
+		LOG_ERROR("Seek set failed");
 		goto err_out;
 	}
 	buf = (char*)calloc(1, (len + 1));
 	if(buf == NULL) {
-		LOG_ERROR("Out of memory\n");
+		LOG_ERROR("Out of memory");
 		goto err_out;
 	}
 	readlen = fread(buf, 1, (size_t)len, filp);
 	if(((readlen < (size_t)len) && (!feof(filp))) || (readlen > (size_t)len)) {
-		LOG_ERROR("failed to read file %s, error: %s\n", path, strerror(errno));
+		LOG_ERROR("failed to read file %s, error: %s", path, strerror(errno));
 		free(buf);
 		goto err_out;
 	}
@@ -760,7 +831,7 @@ int write_file(const char* fname, const char* content, size_t content_len, mode_
 		return 0;
 	dst_fd = open(fname, O_WRONLY | O_CREAT | O_TRUNC, mode);
 	if(dst_fd < 0) {
-		LOG_ERROR("create file: %s, failed: %s\n", fname, strerror(errno));
+		LOG_ERROR("create file: %s, failed: %s", fname, strerror(errno));
 		ret = -1;
 		goto free_out;
 	}
@@ -773,7 +844,7 @@ int write_file(const char* fname, const char* content, size_t content_len, mode_
 	}
 	if(len < 0 || len != content_len) {
 		ret = -1;
-		LOG_ERROR("write file failed: %s\n", strerror(errno));
+		LOG_ERROR("write file failed: %s", strerror(errno));
 		goto free_out;
 	}
 free_out:

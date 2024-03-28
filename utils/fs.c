@@ -13,6 +13,7 @@
 
 #include "fs.h"
 #include "utils.h"
+#include "container_utils.h"
 #include "log.h"
 
 #ifndef JFS_SUPER_MAGIC
@@ -368,8 +369,137 @@ error_out:
     return -1;
 }
 
-/*bool support_overlay(void) {
-	bool is_support = false;
-	FILE *f = NULL;
-	char *line
-}*/
+static int __fs_prepare(const char *fs_name, int fd_from)
+{
+    __do_close int fd_fs = -EBADF;
+    char source[PATH_MAX] = { 0x00 };
+    int ret = 0;
+
+    if (fs_name == NULL) {
+		LOG_ERROR("invalid Null ptr");
+        return -1;
+	}
+
+    if (fd_from >= 0) {
+        ret = snprintf(source, sizeof(source), "/proc/self/fd/%d", fd_from);
+        if (ret < 0) {
+			LOG_ERROR("Failed to create /proc/self/fd/%d", fd_from);
+            return -1;
+		}
+	}
+
+    fd_fs = fsopen(fs_name, FSOPEN_CLOEXEC);
+    if (fd_fs < 0) {
+        LOG_ERROR("Failed to create new open new %s filesystem context : %s", fs_name, strerror(errno));
+		return  -1;
+	}
+
+    if (fd_from >= 0) {
+        ret = fsconfig(fd_fs, FSCONFIG_SET_STRING, "source", source, 0); 
+        if (ret) {
+            LOG_ERROR("Failed to set %s filesystem source to %s : %s", fs_name, source, strerror(errno));
+			return -1;
+		}
+        LOG_INFO("Set %s filesystem source property to %s", fs_name, source);
+    }   
+
+    LOG_INFO("Finished initializing new %s filesystem context %d", fs_name, fd_fs);
+    return move_fd(fd_fs);
+}
+
+int fs_prepare(const char *fs_name, int dfd_from, const char *path_from, __u64 o_flags_from, __u64 resolve_flags_from)
+{
+    __do_close int __fd_from = -EBADF;
+    int fd_from = 0;
+
+    if (path_from != NULL) {
+        struct open_how how = { 
+            .flags      = o_flags_from,
+            .resolve    = resolve_flags_from,
+        };
+
+        __fd_from = openat2(dfd_from, path_from, &how, sizeof(how));
+        if (__fd_from < 0)
+            return -errno;
+        fd_from = __fd_from;
+    } else {
+        fd_from = dfd_from;
+    }   
+
+    return __fs_prepare(fs_name, fd_from);
+}
+
+int fs_set_property(int fd_fs, const char *key, const char *val)
+{
+    int ret;
+
+    ret = fsconfig(fd_fs, FSCONFIG_SET_STRING, key, val, 0);
+    if (ret < 0) {
+        LOG_ERROR("Failed to set \"%s\" to \"%s\" on filesystem context %d : %s", key, val, fd_fs, strerror(errno));
+		return -1;
+	}
+
+    LOG_INFO("Set \"%s\" to \"%s\" on filesystem context %d", key, val, fd_fs);
+    return 0;
+}
+
+int mount_at(int dfd_from, const char *path_from, __u64 resolve_flags_from, int dfd_to, const char *path_to, __u64 resolve_flags_to,
+         const char *fs_name, unsigned int flags, const void *data)
+{
+    __do_close int __fd_from = -EBADF, __fd_to = -EBADF;
+    char *from = NULL, *to = NULL;
+    int fd_from = 0, fd_to = 0, ret = 0;
+    char buf_from[PATH_MAX] = { 0x00 }, buf_to[PATH_MAX] = { 0x00 };
+
+    if (dfd_from < 0 && !abspath(path_from)) {
+        return -1;
+	}
+
+    if (dfd_to < 0 && !abspath(path_to)) {
+        return -1;
+	}
+
+    if (path_from != NULL) {
+        __fd_from = open_at(dfd_from, path_from, PROTECT_OPATH_FILE, resolve_flags_from, 0); 
+        if (__fd_from < 0) {
+            return -1;
+		}
+        fd_from = __fd_from;
+    } else {
+        fd_from = dfd_from;
+    }   
+    if (fd_from >= 0) {
+        ret = snprintf(buf_from, sizeof(buf_from), "/proc/self/fd/%d", fd_from);
+        if (ret < 0) {
+            LOG_ERROR("Failed to create path");
+		}
+        from = buf_from;
+    }   
+
+    if (path_to != NULL) {
+        __fd_to = open_at(dfd_to, path_to, PROTECT_OPATH_FILE, resolve_flags_to, 0); 
+        if (__fd_to < 0) {
+            return -1;
+		}
+        fd_to = __fd_to;
+    } else {
+        fd_to = dfd_to;
+    }   
+    if (fd_to >= 0) {
+        ret = snprintf(buf_to, sizeof(buf_to), "/proc/self/fd/%d", fd_to);
+        if (ret < 0) {
+            LOG_ERROR("Failed to create path");
+		}
+        to = buf_to;
+    }
+
+    ret = mount(from ?: fs_name, to, fs_name, flags, data);
+    if (ret < 0) {
+        LOG_ERROR("Failed to mount \"%s\" to \"%s\"", from == NULL ? "" : from, to == NULL ? "" : to);
+		return -1;
+	}
+
+    LOG_INFO("Mounted \"%s\" to \"%s\"", from == NULL ? "" : from, to == NULL ? "" : to);
+    return 0;
+}
+

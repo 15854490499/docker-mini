@@ -9,26 +9,35 @@ extern "C" {
 
 #define kSmallBuffer 4096
 #define kLargeBuffer 4096 * 1024
-#define shm_file "/dev/shm/shm.docker-mini"
+#define datas_file "/dev/shm/data.docker-mini"
+#define sharedomain_file "/dev/shm/sd.docker-mini"
 
 typedef struct Buffer_item {
 	char data[kLargeBuffer];
 	int size;
 } buffer_item;
 
+struct shared_domain {
+	int pput;
+	int pget;
+	pthread_mutex_t m_mutex;
+	pthread_cond_t m_cond;
+	pthread_mutex_t t_mutex;
+};
+
 struct LogBuffer {
 	buffer_item *datas;
 	int buffer_size;
-	int pput;
-	int pget;
+	struct shared_domain *pshared_domain;
 };
 
 typedef struct Asynclog_ {
-	pthread_mutex_t m_mutex;
-	pthread_cond_t m_cond;
-	int shm_id;
+	int datas_file_id;
+	int sharedomain_file_id;
 	struct LogBuffer buffer;
+#ifdef REBASETOFILE
 	char *filename;
+#endif
 	void (*append)(char *log_str, int log_str_len);
 	void (*start)();
 	void (*stop)();

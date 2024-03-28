@@ -293,13 +293,12 @@ static int get_quota_stat(const char *backing_fs_blockdev)
     int ret = 0;
     int nret = 0;
     fs_quota_stat_t fs_quota_stat_info = { 0 };
-
+	
     ret = quotactl(QCMD(Q_XGETQSTAT, FS_PROJ_QUOTA), backing_fs_blockdev, 0, (caddr_t)&fs_quota_stat_info);
     if (ret != 0) {
-    	LOG_ERROR("Failed to get quota stat on %s\n", backing_fs_blockdev);
+    	LOG_ERROR("Failed to get quota stat on %s", backing_fs_blockdev);
         return ret;
     }
-
     nret = ((fs_quota_stat_info.qs_flags & FS_QUOTA_PDQ_ACCT) >> PDQ_ACCT_BIT) +
            ((fs_quota_stat_info.qs_flags & FS_QUOTA_PDQ_ENFD) >> PDQ_ENFD_BIT);
     if (nret == FS_PROJ_QUOTA) { // return FS_PROJ_QUOTA(2) means project quota is on
@@ -327,12 +326,11 @@ struct pquota_control *project_quota_control_init(const char *home_dir, const ch
     uint32_t min_project_id = 0;
 
     if (home_dir == NULL || fs == NULL) {
-    	LOG_ERROR("Invalid input auguments\n");
+    	LOG_ERROR("Invalid input auguments");
         goto err_out;
     }
-
     if (!fs_support_quota(fs)) {
-    	LOG_ERROR("quota isn't supported for filesystem %s\n", fs);
+    	LOG_ERROR("quota isn't supported for filesystem %s", fs);
         goto err_out;
     }
 
@@ -343,13 +341,13 @@ struct pquota_control *project_quota_control_init(const char *home_dir, const ch
     }
 
     if (ret) {
-    	LOG_ERROR("init project quota rwlock failed\n");
+    	LOG_ERROR("init project quota rwlock failed");
         goto err_out;
     }
 
     ret = get_project_quota_id(home_dir, &min_project_id);
     if (ret) {
-    	LOG_ERROR("Failed to get mininal project id %s\n", home_dir);
+    	LOG_ERROR("Failed to get mininal project id %s", home_dir);
         goto err_out;
     }
     min_project_id++;
@@ -358,12 +356,12 @@ struct pquota_control *project_quota_control_init(const char *home_dir, const ch
 
     ctrl->backing_fs_device = make_backing_fs_device(home_dir);
     if (ctrl->backing_fs_device == NULL) {
-    	LOG_ERROR("Failed to make backing fs device %s\n", home_dir);
+    	LOG_ERROR("Failed to make backing fs device %s", home_dir);
         goto err_out;
     }
 
     if (get_quota_stat(ctrl->backing_fs_device) != 0) {
-    	LOG_ERROR("quota isn't supported on your system %s\n", home_dir);
+    	LOG_ERROR("quota isn't supported on your system %s", home_dir);
         goto err_out;
     }
 

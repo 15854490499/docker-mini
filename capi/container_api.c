@@ -7,7 +7,10 @@
 #include "storage.h"
 #include "container_api.h"
 #include "image_api.h"
+#include "container_utils.h"
 #include "log.h"
+
+#ifdef DAEMON_COMPILE
 
 #define CONTAINER_ID_MAX_LEN 64
 static char *try_generate_id()
@@ -169,7 +172,96 @@ out:
 	return ret;
 }
 
-int container_delete(const container_delete_request *request, container_delete_response **response) {
+int container_start(const container_start_request *request, container_start_response **response) {
+	int ret = 0;
+	char *id = NULL;
+	struct start_handler *handler = NULL;
+	char *default_args[] = {"/sbin/init", NULL};
+	bool started = false;
+	char title[2048] = { 0x00 };
+	int errnum = 0;
+	pid_t pid_first = 0, pid_second = 0;
+	
+	if(request->id == NULL) {
+		LOG_ERROR("invalid Null param");
+		return -1;
+	}
+
+	id = request->id;
+	
+	handler = start_handler_init(NULL, id);
+	if(handler == NULL) {
+		LOG_ERROR("error init start handler");
+		return -1;
+	}
+
+	pid_first = fork();
+	if(pid_first < 0) {
+		LOG_ERROR("error creating new process by fork");
+		return -1;
+	}
+
+	if(pid_first != 0) {
+		started = wait_on_daemonized_start(handler, pid_first);
+		put_start_handler(handler);
+		return 0;
+	}
+	
+	ret = snprintf(title, sizeof(title), "[lxc monitor] %s %s", dockermini_path, id);
+	if(ret > 0) {
+		ret = setproctitle(title);
+		if(ret < 0) {
+			LOG_INFO("Failed to set process title to %s", title);
+		} else {
+			LOG_INFO("Set process title to %s", title);
+		}
+	}
+
+	pid_second = fork();
+	if(pid_second < 0) {
+		LOG_ERROR("Failed to fork first child process");
+		_exit(EXIT_FAILURE);
+	}
+
+	if(pid_second != 0) {
+		put_start_handler(handler);
+		_exit(EXIT_SUCCESS);
+	}
+
+	ret = chdir("/");
+	if(ret < 0) {
+		LOG_ERROR("Failed to change to \"/\" directory");
+		_exit(EXIT_FAILURE);
+	}
+
+	ret = inherit_fds(true, handler->keep_fds, 3);
+	if(ret < 0) {
+		_exit(EXIT_FAILURE);
+	}
+	
+	ret = null_stdfds();
+	if(ret < 0) {
+		LOG_ERROR("ailed to redirect std{in,out,err} to /dev/null");
+		_exit(EXIT_FAILURE);
+	}
+	
+	ret = setsid();
+	if(ret < 0) {
+		LOG_INFO("Process %d is already process group leader", lxc_raw_getpid());
+	}
+	
+	ret = inherit_fds(true, handler->keep_fds, 3);
+	if(ret != 0) {
+		put_start_handler(handler);
+		ret = -1;
+		goto on_error;
+	}
+
+	ret = do_start(default_args, handler, &errnum);
+
+}
+
+int container_remove(const container_remove_request *request, container_remove_response **response) {
 	int ret = 0;
 
 	if(request == NULL || response == NULL) {
@@ -177,7 +269,7 @@ int container_delete(const container_delete_request *request, container_delete_r
 		return -1;
 	}
 
-	*response = common_calloc_s(sizeof(container_delete_response));
+	*response = common_calloc_s(sizeof(container_remove_response));
 	if(*response == NULL) {
 		LOG_ERROR("Out of memory\n");
 		goto out;
@@ -215,6 +307,8 @@ void container_umount_point(const char *container_id) {
 	return;
 }
 
+#endif
+
 void free_container_create_request(container_create_request *req) {
 	if(req == NULL) {
 		return;
@@ -227,6 +321,9 @@ void free_container_create_request(container_create_request *req) {
 	}
 	if(req->image != NULL) {
 		free(req->image);
+	}
+	if(req->container_spec != NULL) {
+		free(req->container_spec);
 	}
 	free(req);
 }
@@ -244,7 +341,31 @@ void free_container_create_response(container_create_response *resp) {
 	free(resp);
 }
 
-void free_container_delete_request(container_delete_request *req) {
+void free_container_start_request(container_start_request *req) {
+	if(req == NULL) {
+		return;
+	}
+	if(req->id != NULL) {
+		free(req->id);
+	}
+
+	free(req);
+}
+
+void free_container_start_response(container_start_response *resp) {
+	if(resp == NULL) {
+		return;
+	}
+	if(resp->id != NULL) {
+		free(resp->id);
+	}
+	if(resp->errmsg != NULL) {
+		free(resp->errmsg);
+	}
+	free(resp);
+}
+
+void free_container_remove_request(container_remove_request *req) {
 	if(req == NULL) {
 		return;
 	}
@@ -256,7 +377,7 @@ void free_container_delete_request(container_delete_request *req) {
 	free(req);
 }
 
-void free_container_delete_response(container_delete_response *resp) {
+void free_container_remove_response(container_remove_response *resp) {
 	if(resp == NULL) {
 		return;
 	}

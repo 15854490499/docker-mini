@@ -14,72 +14,6 @@ typedef int proc_status;
 proc_status proc_wait = 0;
 proc_status proc_error = -1;
 
-docker::ImageManager::ImageManager() {
-	int ret = 0;
-	ret = oci_init();
-	if(ret != 0) {
-		LOG_ERROR("oci init err\n");
-		exit(1);
-	}
-}
-
-std::string docker::ImageManager::PullImage(const std::string image) {
-	int ret = 0;
-	std::string out_str = "";
-	im_pull_request *request { nullptr };
-	im_pull_response *response { nullptr };
-	
-	request = (im_pull_request*)common_calloc_s(sizeof(im_pull_request));
-	if(request == nullptr) {
-		LOG_ERROR("Out of memory\n");
-		goto cleanup;
-	}
-	request->type = strdup_s(IMAGE_TYPE_OCI);
-	request->image = strdup_s(const_cast<char*>(image.c_str()));
-
-	ret = im_pull_image(request, &response);
-	if(ret != 0) {
-		if(response != nullptr && response->errmsg != nullptr) {
-			LOG_ERROR("%s\n", response->errmsg);
-		} else {
-			LOG_ERROR("Failed to call pull image\n");
-		}
-		goto cleanup;
-	}
-	if(response->image_ref != nullptr) {
-		out_str = response->image_ref;
-	}
-cleanup:
-	free_im_pull_request(request);
-	free_im_pull_response(response);
-	return out_str;
-}
-
-void docker::ImageManager::RemoveImage(const std::string image) {
-	int ret = 0;
-	im_rmi_request *request { nullptr };
-	im_remove_response *response { nullptr };
-	
-	request = (im_rmi_request*)common_calloc_s(sizeof(im_rmi_request));
-	if(request == nullptr) {
-		LOG_ERROR("Out of memory\n");
-		goto cleanup;
-	}
-	request->image = strdup_s(image.c_str());
-	request->force = false;
-
-	ret = im_rm_image(request, &response);
-	if(ret != 0) {
-		LOG_ERROR("%s\n", response->errmsg);
-		goto cleanup;
-	}
-
-cleanup:
-	free_im_rmi_request(request);
-	free_im_remove_response(response);
-	return;
-}
-
 docker::container::container() {
 	int ret = 0;
 	ret = oci_init();
@@ -159,7 +93,7 @@ void docker::container::start_container() {
 		LOG_ERROR("sem_open err\n");
 		goto out;
 	}
-
+	LOG_INFO("%d", getpid());
 	child_pid = clone(setup, child_stack, 
 								CLONE_NEWPID|
 								CLONE_NEWNS|
@@ -230,7 +164,7 @@ static int remove_cgroup_dir(const char *id, const char *type)
 		return 0;
 	}
 
-    if (rmdir(cgroup_path) != 0) { 
+    if(rmdir(cgroup_path) != 0) { 
     	LOG_ERROR("Failed to delete cgroup directory %s : %s", cgroup_path, strerror(errno));
         return -1;
     }    
@@ -347,63 +281,6 @@ clear_cpu_dir:
 
 out:
 	return;
-}
-
-void docker::container::create(const CreateRequest *req) {
-	int ret = 0;
-	container_create_request *request { nullptr };
-	container_create_response *response { nullptr };
-
-	request = (container_create_request*)common_calloc_s(sizeof(container_create_request));
-		
-	if(req->container_id.size() != 0) {
-		request->id = (char*)strdup_s(const_cast<char*>(req->container_id.c_str()));
-	} else {
-		request->id = NULL; 
-	}
-	if(req->image.size() != 0) {
-		request->image = (char*)strdup_s(const_cast<char*>(req->image.c_str()));
-	} else {
-		request->image = NULL;
-	}
-	if(req->rootfs.size() != 0) {
-		request->rootfs = (char*)strdup_s(const_cast<char*>(req->rootfs.c_str()));
-	} else {
-		request->rootfs = NULL;
-	}
-	if(req->container_spec.size() != 0) {
-		request->container_spec = (char*)strdup_s(const_cast<char*>(req->container_spec.c_str()));
-	} else {
-		request->container_spec = NULL;
-	}
-
-	ret = container_create(request, &response);
-
-	if(response->errmsg != NULL) {
-		LOG_ERROR("%s\n", response->errmsg);		
-	}
-	
-	free_container_create_request(request);
-	free_container_create_response(response);
-}
-
-void docker::container::remove(const std::string container_id) {
-	int ret = 0;
-	container_delete_request *request { nullptr };
-	container_delete_response *response { nullptr };
-
-	request = (container_delete_request*)common_calloc_s(sizeof(container_delete_request));
-
-	request->id = (char*)strdup_s(const_cast<char*>(container_id.c_str()));
-	
-	ret = container_delete(request, &response);
-
-	if(response->errmsg != NULL) {
-		LOG_ERROR("%s\n", response->errmsg);
-	}
-
-	free_container_delete_request(request);
-	free_container_delete_response(response);
 }
 
 void docker::container::start(const std::string container_id) {
