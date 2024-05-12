@@ -7,7 +7,7 @@
 #include "storage.h"
 #include "container_api.h"
 #include "image_api.h"
-#include "container_utils.h"
+#include "lxcapi.h"
 #include "log.h"
 
 #ifdef DAEMON_COMPILE
@@ -105,6 +105,34 @@ out:
 	return ret;
 }
 
+static int save_runtime_file(const char *id, const char *container_spec) {
+	int ret = 0;
+	char spec_path[PATH_MAX] = { 0x00 };
+	char spec_dir[PATH_MAX] = { 0x00 };
+
+	ret = snprintf(spec_path, sizeof(spec_path), "%s/%s/%s", runtime_dir, id, RUNTIME_JSON);
+	if(ret < 0 || ret >= sizeof(spec_path))  {
+		LOG_ERROR("Failed to get runtime path by id : %s", id);
+		return -1;
+	}
+
+	strcpy(spec_dir, spec_path);
+	ret = mkdir_p(dirname(spec_dir), 0700);
+	if(ret < 0) {
+		LOG_ERROR("Failed to create runtime directory %s.", spec_path);
+		return -1;
+	}
+
+	if(write_file(spec_path, container_spec, strlen(container_spec), 0666) != 0) {
+		LOG_ERROR("Failed to save spec json file");
+		ret = -1;
+		goto out;
+	}
+
+out:
+	return ret;
+}
+
 int container_create(const container_create_request *request, container_create_response **resp) {
 	int ret = 0;
 	char *real_rootfs = NULL;
@@ -141,20 +169,8 @@ int container_create(const container_create_request *request, container_create_r
 	}
 
 	container_spec = request->container_spec;
-	ret = snprintf(spec_path, sizeof(spec_path), "%s/%s/%s", runtime_dir, id, RUNTIME_JSON);
-	if(ret < 0 || ret >= sizeof(spec_path))  {
-		LOG_ERROR("Failed to get runtime path by id : %s", id);
-		return -1;
-	}
-
-	strcpy(spec_dir, spec_path);
-	ret = mkdir_p(dirname(spec_dir), 0700);
-	if(ret < 0) {
-		LOG_ERROR("Failed to create runtime directory %s.", spec_path);
-		return -1;
-	}
-	if(write_file(spec_path, container_spec, strlen(container_spec), 0666) != 0) {
-		LOG_ERROR("Failed to save spec json file");
+	ret = save_runtime_file(id, container_spec);
+	if(ret != 0) {
 		ret = -1;
 		goto out;
 	}
@@ -172,93 +188,218 @@ out:
 	return ret;
 }
 
+static int start_request_check(const container_start_request *request) {
+	int ret = 0;
+
+	if(request->id == NULL) {
+		LOG_ERROR("invalid Null container id");
+		ret = -1;
+		goto out;	
+	}
+
+out:
+	return ret;
+}
+
+static int renew_oci_config(oci_runtime_spec *container_spec, const char *mount_point) {
+	int ret = 0;
+	oci_runtime_spec_root *root = NULL;
+	
+	root = common_calloc_s(sizeof(oci_runtime_spec_root));
+	if(root == NULL) {
+		LOG_ERROR("memory out\n");
+		return -1;
+	}
+	
+	root->path = strdup_s(mount_point);
+	if(root->path == NULL) {
+		ret = -1;
+		goto out;
+	}
+
+	root->readonly = false;
+	
+	container_spec->root = root;
+	
+out:
+	if(ret != 0) {
+		free(root);
+		root = NULL;
+	}
+
+	return ret;
+}
+
+static int do_start_container(const char *id) {
+	int ret = 0;
+	int nret = 0;
+	char bundle[PATH_MAX] = { 0x00 };
+	char spec_path[PATH_MAX] = { 0x00 };
+	char *mount_point = NULL;
+	char *json_data = NULL;
+	parser_error err = NULL;
+	oci_runtime_spec *container_spec = NULL;
+
+	nret = snprintf(bundle, sizeof(bundle), "%s/%s", runtime_dir, id);
+	if(nret < 0 || nret >= sizeof(bundle)) {
+		LOG_ERROR("Failed to get runtime path by id : %s", id);
+		return -1;
+	}
+	
+	nret = snprintf(spec_path, sizeof(spec_path), "%s/%s", bundle, RUNTIME_JSON);
+	if(nret < 0 || nret >= sizeof(spec_path)) {
+		LOG_ERROR("Failed to get runtime json by id : %s", id);
+		return -1;
+	}
+
+	container_spec = oci_runtime_spec_parse_file(spec_path, NULL, &err);
+	if(container_spec == NULL) {
+		LOG_ERROR("Failed to parse the container_spec : %s", err);
+		return -1;
+	}
+
+	mount_point = container_get_mount_point(id);
+	if(mount_point == NULL) {
+		LOG_ERROR("mount container rootfs failed\n");
+		ret = -1;
+		goto out;
+	}
+	
+	if(renew_oci_config(container_spec, mount_point) != 0) {
+		LOG_ERROR("renew container spec failed\n");
+		ret = -1;
+		goto out;
+	}
+	
+	json_data = oci_runtime_spec_generate_json(container_spec, NULL, &err);
+	if(json_data == NULL) {
+		LOG_ERROR("get container_spec failed : %s", err ? err : "");
+		ret = -1;
+		goto out;
+	}
+	
+	container_spec->hostname = strdup_s(id); 
+	if(save_runtime_file(id, json_data) != 0) {
+		ret = -1;
+		goto out;
+	}
+
+	ret = runtime_create(id, container_spec);
+	if(ret != 0) {
+		LOG_ERROR("runtime create failed");
+		ret = -1;
+		goto out;
+	}
+
+	LOG_INFO("runtime create success");
+	
+	ret = runtime_start(id, bundle);
+	if(ret != 0) {
+		LOG_ERROR("runtime start failed");
+		ret = -1;
+		goto out;
+	}
+
+out:
+	if(mount_point != NULL) {
+		free(mount_point);
+	}
+	
+	if(ret != 0) {
+		container_umount_point(id);
+	}
+
+	free_oci_runtime_spec(container_spec);
+	return ret;
+}
+
 int container_start(const container_start_request *request, container_start_response **response) {
 	int ret = 0;
 	char *id = NULL;
-	struct start_handler *handler = NULL;
-	char *default_args[] = {"/sbin/init", NULL};
-	bool started = false;
-	char title[2048] = { 0x00 };
-	int errnum = 0;
-	pid_t pid_first = 0, pid_second = 0;
 	
-	if(request->id == NULL) {
-		LOG_ERROR("invalid Null param");
+	if(response == NULL) {
+		LOG_ERROR("resp is NULL\n");
 		return -1;
 	}
 
-	id = request->id;
-	
-	handler = start_handler_init(NULL, id);
-	if(handler == NULL) {
-		LOG_ERROR("error init start handler");
+	*response = (container_start_response*)common_calloc_s(sizeof(container_start_response));
+	if(*response == NULL) {
+		LOG_ERROR("Out of memory\n");
 		return -1;
 	}
-
-	pid_first = fork();
-	if(pid_first < 0) {
-		LOG_ERROR("error creating new process by fork");
-		return -1;
-	}
-
-	if(pid_first != 0) {
-		started = wait_on_daemonized_start(handler, pid_first);
-		put_start_handler(handler);
-		return 0;
-	}
 	
-	ret = snprintf(title, sizeof(title), "[lxc monitor] %s %s", dockermini_path, id);
-	if(ret > 0) {
-		ret = setproctitle(title);
-		if(ret < 0) {
-			LOG_INFO("Failed to set process title to %s", title);
-		} else {
-			LOG_INFO("Set process title to %s", title);
-		}
-	}
-
-	pid_second = fork();
-	if(pid_second < 0) {
-		LOG_ERROR("Failed to fork first child process");
-		_exit(EXIT_FAILURE);
-	}
-
-	if(pid_second != 0) {
-		put_start_handler(handler);
-		_exit(EXIT_SUCCESS);
-	}
-
-	ret = chdir("/");
-	if(ret < 0) {
-		LOG_ERROR("Failed to change to \"/\" directory");
-		_exit(EXIT_FAILURE);
-	}
-
-	ret = inherit_fds(true, handler->keep_fds, 3);
-	if(ret < 0) {
-		_exit(EXIT_FAILURE);
-	}
-	
-	ret = null_stdfds();
-	if(ret < 0) {
-		LOG_ERROR("ailed to redirect std{in,out,err} to /dev/null");
-		_exit(EXIT_FAILURE);
-	}
-	
-	ret = setsid();
-	if(ret < 0) {
-		LOG_INFO("Process %d is already process group leader", lxc_raw_getpid());
-	}
-	
-	ret = inherit_fds(true, handler->keep_fds, 3);
-	if(ret != 0) {
-		put_start_handler(handler);
+	if(start_request_check(request) != 0) {
 		ret = -1;
-		goto on_error;
+		goto out;
+	}
+	
+	id = request->id;
+
+	ret = do_start_container(id);
+	if(ret != 0) {
+		LOG_ERROR("Failed to start container");
+		ret = -1;
+		goto out;
 	}
 
-	ret = do_start(default_args, handler, &errnum);
+out:
+	if(ret != 0) {
+		(*response)->errmsg = strdup_s("error start container");
+	}
+	(*response)->id = strdup_s(id);
 
+	return ret;
+}
+
+static int stop_request_check(const container_stop_request *request) {
+	int ret = 0;
+
+	if(request->id == NULL) {
+		LOG_ERROR("invalid Null container id");
+		ret = -1;
+		goto out;	
+	}
+
+out:
+	return ret;
+}
+
+int container_stop(const container_stop_request *request, container_stop_response **response) {
+	int ret = 0;
+	char *id = NULL;
+	
+	if(response == NULL) {
+		LOG_ERROR("resp is NULL\n");
+		return -1;
+	}
+
+	*response = (container_stop_response*)common_calloc_s(sizeof(container_stop_response));
+	if(*response == NULL) {
+		LOG_ERROR("Out of memory\n");
+		return -1;
+	}
+	
+	if(stop_request_check(request) != 0) {
+		ret = -1;
+		goto out;
+	}
+	
+	id = request->id;
+
+	ret = runtime_stop(id);
+	if(ret != 0) {
+		LOG_ERROR("Failed to stop container");
+		ret = -1;
+		goto out;
+	}
+
+out:
+	if(ret != 0) {
+		(*response)->errmsg = strdup_s("error stop container");
+	}
+	(*response)->id = strdup_s(id);
+
+	return ret;
 }
 
 int container_remove(const container_remove_request *request, container_remove_response **response) {
@@ -307,6 +448,82 @@ void container_umount_point(const char *container_id) {
 	return;
 }
 
+#else
+
+static int attach_request_check(const container_attach_request *request) {
+	int ret = 0;
+
+	if(request->id == NULL) {
+		LOG_ERROR("invalid Null container id");
+		ret = -1;
+		goto out;	
+	}
+
+out:
+	return ret;
+}
+
+static int do_attach_container(const char *id) {
+	int ret = 0;
+	int nret = 0;
+	char bundle[PATH_MAX] = { 0x00 };
+
+	nret = snprintf(bundle, sizeof(bundle), "%s/%s", runtime_dir, id);
+	if(nret < 0 || nret >= sizeof(bundle)) {
+		LOG_ERROR("Failed to get runtime path by id : %s", id);
+		return -1;
+	}
+	
+	ret = runtime_attach(id, bundle);
+	if(ret != 0) {
+		LOG_ERROR("runtime start failed");
+		ret = -1;
+		goto out;
+	}
+
+out:
+	
+	return ret;
+}
+
+int container_attach(const container_attach_request *request, container_attach_response **response) {
+	int ret = 0;
+	char *id = NULL;
+	
+	if(response == NULL) {
+		LOG_ERROR("resp is NULL\n");
+		return -1;
+	}
+
+	*response = (container_attach_response*)common_calloc_s(sizeof(container_attach_response));
+	if(*response == NULL) {
+		LOG_ERROR("Out of memory\n");
+		return -1;
+	}
+	
+	if(attach_request_check(request) != 0) {
+		ret = -1;
+		goto out;
+	}
+	
+	id = request->id;
+
+	ret = do_attach_container(id);
+	if(ret != 0) {
+		LOG_ERROR("Failed to start container");
+		ret = -1;
+		goto out;
+	}
+
+out:
+	if(ret != 0) {
+		(*response)->errmsg = strdup_s("error attach container");
+	}
+	(*response)->id = strdup_s(id);
+
+	return ret;
+}
+
 #endif
 
 void free_container_create_request(container_create_request *req) {
@@ -353,6 +570,54 @@ void free_container_start_request(container_start_request *req) {
 }
 
 void free_container_start_response(container_start_response *resp) {
+	if(resp == NULL) {
+		return;
+	}
+	if(resp->id != NULL) {
+		free(resp->id);
+	}
+	if(resp->errmsg != NULL) {
+		free(resp->errmsg);
+	}
+	free(resp);
+}
+
+void free_container_stop_request(container_stop_request *req) {
+	if(req == NULL) {
+		return;
+	}
+	if(req->id != NULL) {
+		free(req->id);
+	}
+
+	free(req);
+}
+
+void free_container_stop_response(container_stop_response *resp) {
+	if(resp == NULL) {
+		return;
+	}
+	if(resp->id != NULL) {
+		free(resp->id);
+	}
+	if(resp->errmsg != NULL) {
+		free(resp->errmsg);
+	}
+	free(resp);
+}
+
+void free_container_attach_request(container_attach_request *req) {
+	if(req == NULL) {
+		return;
+	}
+	if(req->id != NULL) {
+		free(req->id);
+	}
+
+	free(req);
+}
+
+void free_container_attach_response(container_attach_response *resp) {
 	if(resp == NULL) {
 		return;
 	}

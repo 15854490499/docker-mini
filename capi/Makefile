@@ -1,4 +1,4 @@
-CFLAGS = -I$(ROOT)/libocispec -I$(ROOT)/utils -I$(ROOT)/registry -I$(ROOT)/storage -I$(ROOT)/log
+CFLAGS = -I$(ROOT)/libocispec -I$(ROOT)/utils -I$(ROOT)/registry -I$(ROOT)/storage -I$(ROOT)/log -I$(ROOT)/lxcapi
 all: $(OBJ_DIR)/image_api.o $(OBJ_DIR)/container_api.o $(OBJ_DIR)/client_image_api.o $(OBJ_DIR)/client_container_api.o 
 
 $(OBJ_DIR)/image_api.o: image_api.c image_api.h

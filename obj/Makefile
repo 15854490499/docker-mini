@@ -53,7 +53,7 @@ all: $(BIN_DIR)/$(CLIENT_BIN) $(BIN_DIR)/$(DAEMON_BIN)
 
 $(BIN_DIR)/$(CLIENT_BIN) : $(CLIENT_OBJ)
 	$(CXX) $^ $(LD) -o $@ -I/usr/local/include \
-						  -L/sdb/home/sch/grpc/install/lib \
+						  -L$(GRPC_PATH) \
 						  -L/lib/x86_64-linux-gnu \
 						  -L/usr/local/lib \
 						  `pkg-config --cflags --libs --static protobuf protobuf-lite grpc grpc++ gpr grpc_unsecure grpc++_unsecure absl_flags absl_flags_parse` \
@@ -68,12 +68,14 @@ $(BIN_DIR)/$(CLIENT_BIN) : $(CLIENT_OBJ)
 						  -lm \
 						  -lz \
 						  -lpthread \
+						  -llxc \
 						  $(GRPC_LIBS) \
 						  -g
 
 $(BIN_DIR)/$(DAEMON_BIN) : $(DAEMON_OBJ)
 	$(CXX) $^ $(LD) -o $@ -I/usr/local/include \
-						  -L/sdb/home/sch/grpc/install/lib \
+						  -L$(GRPC_PATH) \
+						  -L$(LXC_PATH) \
 						  -L/lib/x86_64-linux-gnu \
 						  -L/usr/local/lib \
 						  -lcurl \
@@ -91,5 +93,6 @@ $(BIN_DIR)/$(DAEMON_BIN) : $(DAEMON_OBJ)
 						  -lm \
 						  -lz \
 						  -lpthread \
+						  -llxc \
 						  $(GRPC_LIBS) \
 						  -g

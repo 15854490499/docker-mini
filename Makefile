@@ -2,6 +2,7 @@ C = gcc
 CXX = g++
 ROOT := $(shell pwd)
 SUBDIR := utils \
+		  lxcapi \
 		  capi \
 		  configs \
 		  http \
@@ -22,6 +23,7 @@ DAEMON_BIN := docker-minid
 CLIENT_OBJ := client_asynclog.o \
 			  log.o \
 			  utils.o \
+			  lxcapi.o \
 			  client_image_api.o \
 			  client_container_api.o \
 			  container.grpc.pb.cc.o \
@@ -94,6 +96,7 @@ DAEMON_OBJ := network.o \
 			  driver.o \
 			  project_quota.o \
 			  rootfs.o \
+			  lxcapi.o \
 			  image_api.o \
 			  container_api.o \
 			  config.o \
@@ -108,7 +111,7 @@ DAEMON_OBJ := network.o \
 			  daemon_main.o
 
 
-export C CXX C_LINK OBJ_DIR BIN_DIR CLIENT_BIN DAEMON_BIN CLIENT_OBJ DAEMON_OBJ ROOT
+export C CXX C_LINK OBJ_DIR BIN_DIR CLIENT_BIN DAEMON_BIN CLIENT_OBJ DAEMON_OBJ ROOT LXC_PATH GRPC_PATH
 
 all: CHECKDIR $(SUBDIR) LINKER
 

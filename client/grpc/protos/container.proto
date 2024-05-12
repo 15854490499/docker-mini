@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package container;
+
+service ContainerService {
+	rpc CreateContainer (CreateRequest) returns (CreateReply) {}
+
+	rpc StartContainer (StartRequest) returns (StartReply) {}
+	
+	rpc StopContainer (StopRequest) returns (StopReply) {}
+
+	rpc RemoveContainer (RemoveRequest) returns (RemoveReply) {}
+}
+
+message CreateRequest {
+	string id = 1;
+	string rootfs = 2;
+	string image = 3;
+	string container_spec = 4;
+}
+
+message CreateReply {
+	string id = 1;
+	string errmsg = 2;
+}
+
+message StartRequest {
+	string id = 1;
+}
+
+message StartReply {
+	string id = 1;
+	string errmsg = 2;
+}
+
+message StopRequest {
+	string id = 1;
+}
+
+message StopReply {
+	string id = 1;
+	string errmsg = 2;
+}
+
+message RemoveRequest {
+	string id = 1;
+
+	bool force = 2;
+}
+
+message RemoveReply {
+	string id = 1;
+
+	uint32 exit_status = 2;
+
+	string errmsg = 3;
+}

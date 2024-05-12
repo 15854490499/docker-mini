@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package image;
+
+service ImageService {
+	rpc PullImage(PullImageRequest) returns (PullImageReply) {}
+	rpc RemoveImage(RemoveImageRequest) returns (RemoveImageReply) {}
+}
+
+message PullImageRequest {
+	string image = 1;
+}
+
+message PullImageReply {
+	string image_ref = 1;
+	string errmsg = 2;
+}
+
+message RemoveImageRequest {
+	string image = 1;
+	bool force = 2;
+}
+
+message RemoveImageReply {
+	string errmsg = 1;
+}

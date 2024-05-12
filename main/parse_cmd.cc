@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string.h>
 
+#include "container_api.h"
 #include "grpc_connect.h"
 #include "oci_runtime_spec.h"
 #include "parse_cmd.h"
@@ -89,18 +90,15 @@ static int parse_create_command(int start, int end, char **argv, container_creat
 	}
 	
 	for(int i = start; i < end; i++) {
-		printf("%s\n", argv[i]);
 		if((!strcmp(argv[i], "--memory") || !strcmp(argv[i], "-m")) && i + 1 <  end) {
 			memory->limit_present = 1;
 			memory->limit = std::stoi(argv[++i]);
 		} else if(!strcmp(argv[i], "--cpu-period") && i + 1 < end) {
 			cpu->period_present = 1;
 			cpu->period = std::stoi(argv[++i]);
-			printf("%d\n", cpu->period);
 		} else if(!strcmp(argv[i], "--cpu-quota") && i + 1 < end) {
 			cpu->quota_present = 1;
 			cpu->quota = std::stoi(argv[++i]);
-			printf("%d\n", cpu->quota);
 		} else {
 			(*req)->image = strdup_s(argv[i]);
 			(*req)->id = strdup_s(argv[i]);
@@ -134,6 +132,18 @@ static int parse_rmc_command(int start, int end, char **argv, container_remove_r
 }
 
 static int parse_start_command(int start, int end, char **argv, container_start_request **req) {
+	(*req)->id = strdup_s(argv[start]);
+
+	return 0;
+}
+
+static int parse_stop_command(int start, int end, char **argv, container_stop_request **req) {
+	(*req)->id = strdup_s(argv[start]);
+
+	return 0;
+}
+
+static int parse_attach_command(int start, int end, char **argv, container_attach_request **req) {
 	(*req)->id = strdup_s(argv[start]);
 
 	return 0;
@@ -194,6 +204,31 @@ int parse_command_parameters(struct command_parameter *cmd, int argc, char **arg
 		else if(strcmp(argv[i], "start") == 0 && i + 1 < argc) {
 			cmd->action = strdup_s(argv[i]);
 			container_start_request *req = (container_start_request*)calloc_s(1, sizeof(container_start_request));
+			ret = parse_start_command(i + 1, argc, argv, &req);
+			if(ret != 0) {
+				printf("parse start command err!\n");
+				ret = -1;
+				break;
+			}
+			cmd->arg = (void*)req;
+			break;
+		}
+		else if(strcmp(argv[i], "stop") == 0 && i + 1 < argc) {
+			cmd->action = strdup_s(argv[i]);
+			container_stop_request *req = (container_stop_request*)calloc_s(1, sizeof(container_stop_request));
+			ret = parse_stop_command(i + 1, argc, argv, &req);
+			if(ret != 0) {
+				printf("parse stop command err!\n");
+				ret = -1;
+				break;
+			}
+			cmd->arg = (void*)req;
+			break;
+		}
+		else if(strcmp(argv[i], "attach") == 0 && i + 1 < argc) {
+			cmd->action = strdup_s(argv[i]);
+			container_attach_request *req = (container_attach_request*)calloc_s(1, sizeof(container_attach_request));
+			ret = parse_attach_command(i + 1, argc, argv, &req);
 			if(ret != 0) {
 				printf("parse start command err!\n");
 				ret = -1;
@@ -395,6 +430,66 @@ out:
 	return ret;
 }
 
+int do_stop_container(container_stop_request *req) {
+	int ret = 0;
+	container_stop_response *resp { nullptr };
+	grpc_connect_ops *ops { nullptr };
+
+	client_connect_config config = get_connect_config();
+	resp = (container_stop_response*)common_calloc_s(sizeof(container_stop_response));
+	if(resp == NULL) {
+		printf("memory out\n");
+		ret = -1;
+		goto out;
+	}
+	
+	ops = get_grpc_connect_ops();
+	if(ops == NULL || ops == nullptr) {
+		printf("invalid NULL ptr\n");
+		ret = -1;
+		goto out;
+	}
+
+	ret = ops->container.stop(req, resp, &config);
+	if(ret != 0) {
+		printf("start container failed\n");
+	}
+
+out:
+	free_connect_config(&config);
+	if(resp != NULL && resp->errmsg != NULL) {
+		printf("%s\n", resp->errmsg);
+	}
+	free_container_stop_request(req);
+	free_container_stop_response(resp);
+	return ret;
+}
+
+int do_attach_container(container_attach_request *req) {
+	int ret = 0;
+	container_attach_response *resp { nullptr };
+
+	resp = (container_attach_response*)common_calloc_s(sizeof(container_attach_response));
+	if(resp == NULL) {
+		printf("memory out\n");
+		ret = -1;
+		goto out;
+	}
+	
+	ret = container_attach(req, &resp);
+	if(ret != 0) {
+		printf("attach container failed\n");
+	}
+
+out:
+	if(resp != NULL && resp->errmsg != NULL) {
+		printf("%s\n", resp->errmsg);
+	}
+	free_container_attach_request(req);
+	free_container_attach_response(resp);
+	return ret;
+}
+
 int execute_command(struct command_parameter *cmd) {
 	int ret = 0;
 	
@@ -419,6 +514,12 @@ int execute_command(struct command_parameter *cmd) {
 		}
 		else if(strcmp(cmd->action, "start") == 0) {
 			ret = do_start_container((container_start_request*)(cmd->arg));
+		}
+		else if(strcmp(cmd->action, "stop") == 0) {
+			ret = do_stop_container((container_stop_request*)(cmd->arg));
+		}
+		else if(strcmp(cmd->action, "attach") == 0) {
+			ret = do_attach_container((container_attach_request*)(cmd->arg));
 		}
 	}
 		

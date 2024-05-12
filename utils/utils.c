@@ -344,51 +344,6 @@ int safe_strtod(const char *numstr, double *converted)
     return 0;
 }
 
-int open_devnull()
-{
-    int fd = open("/dev/null", O_RDWR);
-    if (fd < 0) 
-        SYSERROR("Can't open /dev/null");
-
-    return fd;
-}
-
-int set_stdfds(int fd)
-{
-    int ret; 
-
-    if (fd < 0) 
-        return -1;
-
-    ret = dup2(fd, STDIN_FILENO);
-    if (ret < 0) 
-        return -1;
-
-    ret = dup2(fd, STDOUT_FILENO);
-    if (ret < 0) 
-        return -1;
-
-    ret = dup2(fd, STDERR_FILENO);
-    if (ret < 0) 
-        return -1;
-
-    return 0;
-}
-
-int null_stdfds()
-{
-    int ret = -1;
-    int fd;
-
-    fd = open_devnull();
-    if (fd >= 0) {
-        ret = set_stdfds(fd);
-        close(fd);
-    }
-
-    return ret;
-}
-
 static int parse_unit_multiple(const char *unit, int64_t *mltpl) {
 	size_t i;
 	if(unit[0] == '\0') {
@@ -1608,6 +1563,23 @@ rep:
 	return 0;
 }
 
+int wait_for_pid_status(pid_t pid) {
+	int st;
+	int nret = 0;
+rep:
+	nret = waitpid(pid, &st, 0);
+	if(nret == -1) {
+		if(errno == EINTR) {
+			goto rep;
+		}
+		return -1;
+	}
+	if(nret != pid) {
+		goto rep;
+	}
+	return st;
+}
+
 #define BLKSIZE 32768
 // Compress
 int gzip_z(const char *srcfile, const char *dstfile, const mode_t mode)
@@ -1623,20 +1595,20 @@ int gzip_z(const char *srcfile, const char *dstfile, const mode_t mode)
 
     srcfd = open(srcfile, O_RDONLY, 0644);
     if (srcfd < 0) {
-    	LOG_ERROR("Open src file: %s, failed: %s\n", srcfile, strerror(errno));
+    	LOG_ERROR("Open src file: %s, failed: %s", srcfile, strerror(errno));
         return -1; 
     }   
 
     stream = gzopen(dstfile, "w");
     if (stream == NULL) {
-    	LOG_ERROR("gzopen %s error: %s\n", dstfile, strerror(errno));
+    	LOG_ERROR("gzopen %s error: %s", dstfile, strerror(errno));
         close(srcfd);
         return -1; 
     }   
 
     buffer = calloc_s(1, BLKSIZE);
     if (buffer == NULL) {
-    	LOG_ERROR("out of memory\n");
+    	LOG_ERROR("out of memory");
         ret = -1; 
         goto out;
     }   
@@ -1644,7 +1616,7 @@ int gzip_z(const char *srcfile, const char *dstfile, const mode_t mode)
     while (true) {
         size = read_nointr(srcfd, buffer, BLKSIZE);
         if (size < 0) {
-        	LOG_ERROR("read file %s failed: %s\n", srcfile, strerror(errno));
+        	LOG_ERROR("read file %s failed: %s", srcfile, strerror(errno));
             ret = -1; 
             break;
         } else if (size == 0) {
@@ -1655,14 +1627,14 @@ int gzip_z(const char *srcfile, const char *dstfile, const mode_t mode)
         if (n <= 0 || n != (size_t)size) {
             gzerr = gzerror(stream, &errnum);
             if (gzerr != NULL && strcmp(gzerr, "") != 0) {
-            	LOG_ERROR("gzread error: %s\n", gzerr);
+            	LOG_ERROR("gzread error: %s", gzerr);
             }
             ret = -1;
             break;
         }
     }
     if (chmod(dstfile, mode) != 0) {
-    	LOG_ERROR("Change mode of tar-split file\n");
+    	LOG_ERROR("Change mode of tar-split file");
         ret = -1;
     }
 
@@ -1672,7 +1644,7 @@ out:
     free(buffer);
     if (ret != 0) {
         if (path_remove(dstfile) != 0) {
-        	LOG_ERROR("Remove file %s failed: %s\n", dstfile, strerror(errno));
+        	LOG_ERROR("Remove file %s failed: %s", dstfile, strerror(errno));
         }
     }
 
@@ -1701,13 +1673,13 @@ char *oci_default_tag(const char *name)
 	int nlen = 0;
 
     if (name == NULL) {
-    	LOG_ERROR("Invalid NULL param\n");
+    	LOG_ERROR("Invalid NULL param");
         return NULL;
     }
 
     parts = string_split(name, '/', &nlen);
     if (parts == NULL) {
-    	LOG_ERROR("split %s by '/' failed\n", name);
+    	LOG_ERROR("split %s by '/' failed", name);
         return NULL;
     }
 
@@ -1735,7 +1707,7 @@ char *oci_add_host(const char *host, const char *name) {
 	bool need_repo_prefix = false;
 
 	if(host == NULL || name == NULL) {
-		LOG_ERROR("Invalid NULL param\n");
+		LOG_ERROR("Invalid NULL param");
 		return NULL;
 	}
 	
@@ -1750,7 +1722,7 @@ char *oci_add_host(const char *host, const char *name) {
 
 	with_host = common_calloc_s(strlen(host) + strlen("/") + strlen(REPO_PREFIX_TO_STRIP) + strlen(name) + 1);
 	if(with_host == NULL) {
-		LOG_ERROR("out of memory\n");
+		LOG_ERROR("out of memory");
 		return NULL;
 	}
 	strcat(with_host, host);
@@ -1799,7 +1771,7 @@ bool valid_image_name(const char *name) {
 	bool bret = false;
 
 	if(name == NULL) {
-		LOG_ERROR("invalid NULL param\n");
+		LOG_ERROR("invalid NULL param");
 		return false;
 	}
 
@@ -1833,4 +1805,51 @@ bool valid_image_name(const char *name) {
 cleanup:
 	free(copy);
 	return bret;
+}
+
+int open_devnull() {
+	int fd = open("/dev/null", O_RDWR);
+	if(fd < 0) {
+		LOG_ERROR("Can't open /dev/null");
+	}
+
+	return fd;
+}
+
+int set_stdfds(int fd) {
+	int ret = 0;
+
+	if(fd < 0) {
+		return -1;
+	}
+
+	ret = dup2(fd, STDIN_FILENO);
+	if(ret < 0) {
+		return -1;
+	}
+
+	ret = dup2(fd, STDOUT_FILENO);
+	if(ret < 0) {
+		return -1;
+	}
+
+	ret = dup2(fd, STDERR_FILENO);
+	if(ret < 0) {
+		return -1;
+	}
+
+	return 0;
+}
+
+int null_stdfds() {
+	int ret = -1;
+	int fd = 0;
+
+	fd = open_devnull();
+	if(fd >= 0) {
+		ret = set_stdfds(fd);
+		close(fd);
+	}
+
+	return ret;
 }

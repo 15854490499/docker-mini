@@ -60,7 +60,7 @@ int path_remove(const char *path);
 char *path_dir(const char *path);
 char *path_base(const char *path);
 char *clean_path(const char *path, char *realpath, size_t realpath_len);
-inline bool abspath(const char *str);
+//inline bool abspath(const char *str);
 //int normalized_host_os_arch(char **host_os, char **host_arch, char **host_variant);
 size_t strlncat(char* dststr, size_t size, const char* srcstr, size_t nsize);
 
@@ -94,7 +94,9 @@ ssize_t write_nointr(int fd, const void *buf, size_t count);
 ssize_t read_nointr(int fd, void *buf, size_t count);
 int atomic_write_file(const char *fname, const char *content, size_t content_len, mode_t mode, bool sync);
 
+#define ExitSignalOffset 128
 int wait_for_pid(pid_t pid);
+int wait_for_pid_status(pid_t pid);
 
 int gzip_z(const char *srcfile, const char *dstfile, const mode_t mode);
 
