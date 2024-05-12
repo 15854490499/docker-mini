@@ -163,28 +163,34 @@ Linux下对于docker容器引擎的简单模拟
     sudo -E make LXC_PATH=your-lxc-lib-path GRPC_PATH=your-grpc-lib-path
     ```
 
+* 启动服务端
+
+	```C++
+    sudo -E bin/./docker-minid
+    ```
+
 * 拉取镜像
 
     ```C++
-    bin/./docker-mini pull image-name 如（nginx）
+    sudo -E bin/./docker-mini pull image-name 如（nginx）
     ```
 
 * 删除镜像
 	
 	```C++
-    bin/./docker-mini rmi image-name
+    sudo -E bin/./docker-mini rmi image-name
 	```
 
 * 创建容器
 
 	```C++
-    bin/./docker-mini create image-name
+    sudo -E bin/./docker-mini create image-name
 	```
 
 * 启动容器
 
 	```C++
-    bin/./docker-mini start container-id  
+    sudo -E bin/./docker-mini start container-id  
 	  
 
 	--memory / -m 添加cgroup memory limit，如-m 10485760  
@@ -205,25 +211,24 @@ Linux下对于docker容器引擎的简单模拟
 	user  root;
 	```
 	3. 启动nginx，在宿主机内连接容器nginx，http:192.168.0.100:80，结果如图。  
-	![nginx.jpg](https://github.com/15854490499/docker-mini/blob/main/nginx.png)
-
+	![nginx.jpg](https://github.com/15854490499/docker-mini/blob/main/nginx.png) 
 
 * 连接容器
 
 	```C++
-    bin/./docker-mini attach container-id
+    sudo -E bin/./docker-mini attach container-id
 	```
 
 * 关闭容器
 	
 	```C++
-    bin/./docker-mini stop container-id
+    sudo -E bin/./docker-mini stop container-id
 	```
 
 * 删除容器
 
 	```C++
-    bin/./docker-mini rm container-id
+    sudo -E bin/./docker-mini rm container-id
 	```
 
 
