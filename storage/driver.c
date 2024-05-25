@@ -1374,6 +1374,10 @@ static char *do_mount_layer(const char *id, const char *layer_dir, const struct 
         goto error_out;
     }
 
+	if(!dir_exists(merged_dir) && mkdir_p(merged_dir, 0666) != 0) {
+		goto error_out;
+	}
+
     if (!use_rel_mount) {
         if (abs_mount(layer_dir, merged_dir, mount_data) != 0) {
         	LOG_ERROR("Failed to mount %s with option \"%s\"\n", merged_dir, mount_data);
@@ -1493,8 +1497,13 @@ int graphdriver_umount_layer(const char *id)
 
     return ret;
 }
+
 void free_graphdriver_mount_opts(struct driver_mount_opts *opts) {
-	if(opts->mount_label) {
+	if(opts == NULL) {
+		return;
+	}
+
+	if(opts->mount_label != NULL) {
 		free(opts->mount_label);
 	}
 	free_array_by_len(opts->options, opts->options_len);

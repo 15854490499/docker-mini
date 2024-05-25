@@ -829,8 +829,6 @@ ssize_t write_nointr(int fd, const void *buf, size_t count)
 
 ssize_t read_nointr(int fd, void *buf, size_t count)
 {
-	//printf("===========read_nointr=============\n");
-	//printf("%d\n", fd);
     ssize_t nret;
 
     if (buf == NULL) {
@@ -845,7 +843,6 @@ ssize_t read_nointr(int fd, void *buf, size_t count)
             break;
         }
     }
-	//printf("**********read_nointr************\n");
     return nret;
 }
 

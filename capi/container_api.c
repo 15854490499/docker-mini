@@ -240,13 +240,13 @@ static int do_start_container(const char *id) {
 	parser_error err = NULL;
 	oci_runtime_spec *container_spec = NULL;
 
-	nret = snprintf(bundle, sizeof(bundle), "%s/%s", runtime_dir, id);
+	nret = snprintf(bundle, sizeof(bundle), "%s/%s", run_dir, id);
 	if(nret < 0 || nret >= sizeof(bundle)) {
 		LOG_ERROR("Failed to get runtime path by id : %s", id);
 		return -1;
 	}
 	
-	nret = snprintf(spec_path, sizeof(spec_path), "%s/%s", bundle, RUNTIME_JSON);
+	nret = snprintf(spec_path, sizeof(spec_path), "%s/%s/%s", runtime_dir, id, RUNTIME_JSON);
 	if(nret < 0 || nret >= sizeof(spec_path)) {
 		LOG_ERROR("Failed to get runtime json by id : %s", id);
 		return -1;
@@ -364,6 +364,36 @@ out:
 	return ret;
 }
 
+static void runtime_resource_clear(const char *id) {
+	int ret = 0;
+	int nret = 0;
+	char bundle[PATH_MAX] = { 0x00 };
+	char mount_spec_path[PATH_MAX] = { 0x00 };
+
+	nret = snprintf(mount_spec_path, sizeof(mount_spec_path), "%s/%s.json", run_dir, id);
+	if(nret < 0 || nret >= sizeof(mount_spec_path)) {
+		LOG_ERROR("Failed to get mount spec path by id : %s", id);
+		return -1;
+	}
+	
+	if(file_exists(mount_spec_path)) {
+		path_remove(mount_spec_path);
+	}
+
+	nret = snprintf(bundle, sizeof(bundle), "%s/%s", run_dir, id);
+	if(nret < 0 || nret >= sizeof(bundle)) {
+		LOG_ERROR("Failed to get runtime path by id : %s", id);
+		return -1;
+	}
+
+	if(dir_exists(bundle)) {
+		recursive_remove_path(bundle);
+		return;
+	}
+
+	return;
+}
+
 int container_stop(const container_stop_request *request, container_stop_response **response) {
 	int ret = 0;
 	char *id = NULL;
@@ -386,6 +416,8 @@ int container_stop(const container_stop_request *request, container_stop_respons
 	
 	id = request->id;
 
+	container_umount_point(id);
+
 	ret = runtime_stop(id);
 	if(ret != 0) {
 		LOG_ERROR("Failed to stop container");
@@ -393,6 +425,8 @@ int container_stop(const container_stop_request *request, container_stop_respons
 		goto out;
 	}
 
+	runtime_resource_clear(id);
+	
 out:
 	if(ret != 0) {
 		(*response)->errmsg = strdup_s("error stop container");
@@ -404,6 +438,8 @@ out:
 
 int container_remove(const container_remove_request *request, container_remove_response **response) {
 	int ret = 0;
+	int nret = 0;
+	char bundle[PATH_MAX] = { 0x00 };
 
 	if(request == NULL || response == NULL) {
 		LOG_ERROR("Invalid NULL input\n");
@@ -419,6 +455,16 @@ int container_remove(const container_remove_request *request, container_remove_r
 	if(im_remove_container_rootfs(request->id)) {
 		ret = -1;
 		goto out;
+	}
+	
+	nret = snprintf(bundle, sizeof(bundle), "%s/%s", runtime_dir, request->id);
+	if(nret < 0 || nret >= sizeof(bundle)) {
+		LOG_ERROR("Failed to get mount spec path by id : %s", request->id);
+		return -1;
+	}
+	
+	if(dir_exists(bundle)) {
+		recursive_remove_path(bundle);
 	}
 
 out:
@@ -468,7 +514,7 @@ static int do_attach_container(const char *id) {
 	int nret = 0;
 	char bundle[PATH_MAX] = { 0x00 };
 
-	nret = snprintf(bundle, sizeof(bundle), "%s/%s", runtime_dir, id);
+	nret = snprintf(bundle, sizeof(bundle), "%s/%s", run_dir, id);
 	if(nret < 0 || nret >= sizeof(bundle)) {
 		LOG_ERROR("Failed to get runtime path by id : %s", id);
 		return -1;

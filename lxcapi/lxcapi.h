@@ -5,6 +5,9 @@
 #include "oci_runtime_spec.h"
 
 #define runtime_dir "/var/lib/docker-mini/runtime"
+#define run_dir "/var/lib/docker-mini/run"
+#define DEFAULT_NET_TYPE "veth"
+#define DEFAULT_NET_LINK "docker-mini0"
 #define DEFAULT_BUF_LEN 128
 #define DEFAULT_CPU_PERIOD 100000
 #define COMMON_CONFIG "/usr/local/share/lxc/config/common.conf"

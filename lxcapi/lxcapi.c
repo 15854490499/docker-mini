@@ -12,13 +12,26 @@ static int create_partial(const struct lxc_container *c)
     int fd = 0; 
     int ret = 0; 
     struct flock lk;
-    char path[PATH_MAX] = { 0 }; 
+    char path[PATH_MAX] = { 0x00 }; 
+    char base[PATH_MAX] = { 0x00 }; 
 
-    ret = snprintf(path, PATH_MAX, "%s/%s/partial", c->config_path, c->name);
+    ret = snprintf(base, PATH_MAX, "%s/%s", c->config_path, c->name);
     if (ret < 0 || (size_t)ret >= PATH_MAX) {
         LOG_ERROR("Error writing partial pathname");
         return -1;
-    }    
+    }
+
+	ret = mkdir_p(base, 0666);
+	if(ret != 0) {
+		LOG_ERROR("Failed to mkdir runtime path by id : %s", c->name);
+		return -1;
+	}
+
+	ret = snprintf(path, PATH_MAX, "%s/partial", base, c->name);
+    if (ret < 0 || (size_t)ret >= PATH_MAX) {
+        LOG_ERROR("Error writing partial pathname");
+        return -1;
+    }
 
     fd = open(path, O_RDWR | O_CREAT | O_EXCL, 0666);
     if (fd < 0) { 
@@ -319,6 +332,73 @@ out:
 	return ret;
 }
 
+static int add_hw_addr(struct lxc_params_list *lxc_conf) { 
+	int ret = 0;
+	int i = 0;
+	struct lxc_params_list *node = NULL;
+	char hwaddr[PATH_MAX] = { 0x00 };
+	
+	hwaddr[0] = '0';
+	hwaddr[1] = '0';
+	hwaddr[2] = ':';
+	hwaddr[3] = '0';
+	hwaddr[4] = '0';
+
+	for(i = 2; i < 6; i++) {
+		if(generate_random_str(hwaddr + 3 * i, 2)) {
+			LOG_ERROR("Failed to generate mac addr");
+			goto err_out;
+		}
+		if(i > 0) {
+			hwaddr[3*i-1] = ':';
+		}
+	}
+	
+	node = create_lxc_list_node("lxc.net.0.hwaddr", hwaddr);
+	if(node == NULL) {
+		goto err_out;
+	}
+	lxc_list_merge(lxc_conf, node);
+
+	goto out;
+
+err_out:
+	ret = -1;
+out:
+	return ret;
+}
+
+static int add_lxc_network(struct lxc_params_list *lxc_conf) {
+	int ret = 0;
+	struct lxc_params_list *node = NULL;
+
+	node = create_lxc_list_node("lxc.net.0.type", DEFAULT_NET_TYPE);
+	if(node == NULL) {
+		ret = -1;
+		goto out;
+	}
+	lxc_list_merge(lxc_conf, node);
+	
+	node = create_lxc_list_node("lxc.net.0.link", DEFAULT_NET_LINK);
+	if(node == NULL) {
+		ret = -1;
+		goto out;
+	}
+	lxc_list_merge(lxc_conf, node);
+
+	node = create_lxc_list_node("lxc.net.0.flags", "up");
+	if(node == NULL) {
+		ret = -1;
+		goto out;
+	}
+	lxc_list_merge(lxc_conf, node);
+
+	ret = add_hw_addr(lxc_conf);
+	
+out:
+	return ret;
+}
+
 static FILE *lxc_open_config_file(const char *bundle)
 {
     char config[PATH_MAX] = { 0 }; 
@@ -334,7 +414,7 @@ static FILE *lxc_open_config_file(const char *bundle)
 
     fd = open(config, O_CREAT | O_TRUNC | O_CLOEXEC | O_WRONLY, 0666);
     if (fd == -1) {
-        LOG_ERROR("Create file %s failed, %s", config, strerror(errno));
+        LOG_ERROR("Create file %s failed : %s", config, strerror(errno));
         goto out; 
     }    
 
@@ -358,12 +438,12 @@ static int save_lxc_config(const char *id, struct lxc_params_list *lxc_conf) {
 	int len = 0;
     FILE *fp = NULL;
 
-	nret = snprintf(bundle, sizeof(bundle), "%s/%s", runtime_dir, id);
+	nret = snprintf(bundle, sizeof(bundle), "%s/%s", run_dir, id);
 	if(nret < 0 || nret >= sizeof(bundle)) {
 		LOG_ERROR("Failed to get runtime path by id : %s", id);
 		return -1;
 	}
-
+		
 	fp = lxc_open_config_file(bundle);
 	if(fp == NULL) {
 		return -1;
@@ -432,6 +512,13 @@ static int create_lxc_spec(const char *id, oci_runtime_spec *oci_spec) {
 		goto out;
 	}
 
+	ret = add_lxc_network(lxc_conf);
+	if(ret != 0) {
+		LOG_ERROR("Failed to add lxc network");
+		ret = -1;
+		goto out;
+	}
+
 	ret = save_lxc_config(id, lxc_conf);
 	if(ret != 0) {
 		LOG_ERROR("Failed to save lxc config file");
@@ -445,11 +532,12 @@ out:
 }
 
 int runtime_create(const char *id, oci_runtime_spec *container_spec) {
+	
 	int ret = 0;
 	struct lxc_container *c = NULL;
 	int partial_fd = -1;
 
-	c = lxc_container_new(id, runtime_dir);
+	c = lxc_container_new(id, run_dir);
 	if(c == NULL) {
 		LOG_ERROR("new lxc container failed\n");
 		return -1;
@@ -592,14 +680,14 @@ static int wait_start_pid(pid_t pid, int rfd, const char *name, const char *path
     LOG_ERROR("Start container failed : %s\n", strerror(errno));
 
     LOG_INFO("begin to stop container\n");
-    if (!lxc_kill(name, path, SIGKILL)) {
+    if (lxc_kill(name, path, SIGKILL) != 0) {
         LOG_ERROR("Failed to stop container");
     }    
 
     size_read = read(rfd, buffer, sizeof(buffer) - 1);
     if (size_read > 0) { 
         LOG_ERROR("Runtime error: %s", buffer);
-    }    
+    }
     return -1;
 }
 
@@ -635,7 +723,7 @@ int runtime_start(const char *id, const char *config_path) {
 	}
 	
 	request.name = strdup_s(id);
-	request.path = strdup_s(runtime_dir);
+	request.path = strdup_s(run_dir);
 	request.logpath = strdup_s(logpath);
 	request.loglevel = strdup_s(DEFAULT_LOGLEVEL);
 	request.start_timeout = DEFAULT_TIMEOUT;
@@ -659,7 +747,7 @@ int runtime_start(const char *id, const char *config_path) {
 	close(pipefd[1]);
 	ret = wait_start_pid(pid, pipefd[0], id, path);
 	close(pipefd[0]);
-	return 0;
+	return ret;
 }
 
 static void execute_lxc_attach(const struct lxc_attach_request *request) {
@@ -697,7 +785,7 @@ int runtime_attach(const char *id, const char *config_path) {
 		return -1;
 	}
 
-	c = lxc_container_new(id, runtime_dir);
+	c = lxc_container_new(id, run_dir);
 	if(c == NULL) {
 		LOG_ERROR("Failed to delete container");
 		goto out;
@@ -710,7 +798,7 @@ int runtime_attach(const char *id, const char *config_path) {
 	lxc_container_put(c);
 
 	request.name = strdup_s(id);
-	request.path = strdup_s(runtime_dir);
+	request.path = strdup_s(run_dir);
 	request.logpath = strdup_s(logpath);
 	request.loglevel = strdup_s(DEFAULT_LOGLEVEL);
 
@@ -729,7 +817,7 @@ int runtime_stop(const char *id) {
 	int ret = 0;
     struct lxc_container *c = NULL;
 
-	c = lxc_container_new(id, runtime_dir);
+	c = lxc_container_new(id, run_dir);
 	if(c == NULL) {
 		LOG_ERROR("Failed to delete container");
 		goto out;
@@ -741,8 +829,16 @@ int runtime_stop(const char *id) {
 	
 	ret = c->stop(c);
 	if(ret == 0) {
-		LOG_ERROR("Eexecute stop error");
+		LOG_ERROR("Eexecute lxc->stop error");
 		ret = -1;
+		goto out_put;
+	}
+
+	ret = c->destroy(c);
+	if(ret == 0) {
+		LOG_ERROR("Eexecute lxc->destroy error");
+		ret = -1;
+		goto out_put;
 	}
 
 	ret = 0;

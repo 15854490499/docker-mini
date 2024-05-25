@@ -1569,19 +1569,19 @@ char *storage_rootfs_mount(const char *container_id)
     char *mount_point = NULL;
     storage_rootfs *rootfs_info = NULL;
 
-    if (container_id == NULL) {
+    if(container_id == NULL) {
     	LOG_ERROR("Invalid input arguments");
         goto out; 
     }    
-
-    rootfs_info = rootfs_store_get_rootfs(container_id);
-    if (rootfs_info == NULL) {
+    
+	rootfs_info = rootfs_store_get_rootfs(container_id);
+    if(rootfs_info == NULL) {
     	LOG_ERROR("Failed to get rootfs %s info", container_id);
         goto out; 
     }    
 
     mount_point = layer_store_mount(rootfs_info->layer);
-    if (mount_point == NULL) {
+    if(mount_point == NULL) {
     	LOG_ERROR("Failed to mount %s", rootfs_info->layer);
         goto out; 
     }    
@@ -1621,7 +1621,6 @@ out:
 char *get_container_mount_point(const char *image_name) {
 	char *id = NULL;
 	char *mount_point = NULL;
-	
 	id = rootfs_store_get_id(image_name);
 	if(id == NULL) {
 		return NULL;

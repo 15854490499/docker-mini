@@ -176,6 +176,7 @@ static char *oci_resolve_image_name(const char *name) {
 }
 
 static int oci_rm_image(const im_remove_request *request) {
+	printf("11111111111111111111111111111\n");
 	int ret = 0;
 	char *image_id = NULL;
 	char *real_image_name = NULL;
@@ -196,6 +197,7 @@ static int oci_rm_image(const im_remove_request *request) {
 		goto out;
 	}
 
+	printf("2222222222222222222222222222222\n");
 	real_image_name = oci_resolve_image_name(request->image);
 	if(real_image_name == NULL) {
 		LOG_ERROR("Failed to resolve image name\n");
@@ -203,12 +205,14 @@ static int oci_rm_image(const im_remove_request *request) {
 		goto out;
 	}
 
+	printf("2222222222222222222222222222222\n");
 	if(storage_img_get_names(real_image_name, &image_names, &image_names_len) != 0) {
 		LOG_ERROR("Get image %s names failed\n", real_image_name);
 		ret = -1;
 		goto out;
 	}
 
+	printf("2222222222222222222222222222222\n");
 	image_id = storage_img_get_image_id(real_image_name);
 	if(image_id == NULL) {
 		LOG_ERROR("Get id of image %s failed\n", real_image_name);
@@ -216,6 +220,7 @@ static int oci_rm_image(const im_remove_request *request) {
 		goto out;
 	}
 
+	printf("2222222222222222222222222222222\n");
 	if(image_names_len == 1 || has_prefix(image_id, real_image_name)) {
 		ret = storage_img_delete(real_image_name, true);
 		if(ret != 0) {
@@ -224,6 +229,7 @@ static int oci_rm_image(const im_remove_request *request) {
 		goto out;
 	}
 
+	printf("2222222222222222222222222222222\n");
 	reduced_image_names = (char**)calloc_s(sizeof(char*), image_names_len - 1);
 	if(reduced_image_names == NULL) {
 		LOG_ERROR("Out of memory\n");
@@ -231,6 +237,7 @@ static int oci_rm_image(const im_remove_request *request) {
 		goto out;
 	}
 
+	printf("2222222222222222222222222222222\n");
 	for(i = 0; i < image_names_len; i++) {
 		if(strcmp(image_names[i], real_image_name) != 0) {
 			reduced_image_names[reduced_image_names_len] = strdup_s(image_names[i]);
@@ -243,6 +250,7 @@ static int oci_rm_image(const im_remove_request *request) {
 		}
 	}
 
+	printf("2222222222222222222222222222222\n");
 	ret = storage_img_set_names(real_image_name, (const char**)reduced_image_names, reduced_image_names_len);
 	if(ret != 0) {
 		LOG_ERROR("Failed to set names of image %s\n", real_image_name);
@@ -250,10 +258,12 @@ static int oci_rm_image(const im_remove_request *request) {
 	}
 
 out:
+	printf("==============oci_rm_image=======================\n");
 	free(real_image_name);
 	free(image_id);
 	free_array_by_len(image_names, image_names_len);
 	free_array_by_len(reduced_image_names, image_names_len - 1);
+	printf("==============oci_rm_image=======================\n");
 	return ret;
 }
 
