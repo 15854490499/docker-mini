@@ -386,8 +386,7 @@ static int rebase_hardlink(struct archive_entry *entry, const char *src_base, co
 
     nret = snprintf(path, sizeof(path), "%s%s", dst_base, linkname + strlen(src_base));
     if (nret < 0 || (size_t)nret >= sizeof(path)) {
-    	LOG_ERROR("snprintf %s%s failed\n", dst_base, linkname + strlen(src_base));
-        fprintf(stderr, "snprintf %s%s failed\n", dst_base, linkname + strlen(src_base));
+    	LOG_ERROR("snprintf %s%s failed", dst_base, linkname + strlen(src_base));
         return -1;
     }
 
@@ -411,7 +410,7 @@ static void try_to_replace_exited_dst(const char *dst_path, struct archive_entry
     }
 
     if (recursive_remove_path(dst_path) != 0) {
-    	LOG_ERROR("Failed to remove path %s while unpack\n", dst_path);
+    	LOG_ERROR("Failed to remove path %s while unpack", dst_path);
     }
 
     return;
@@ -462,7 +461,7 @@ int archive_unpack_handler(const struct io_read_wrapper *content, const struct a
 
     mydata = calloc_s(sizeof(struct archive_content_data), 1);
     if (mydata == NULL) {
-    	LOG_ERROR("Memory out\n");
+    	LOG_ERROR("Memory out");
         fprintf(stderr, "Memory out");
         ret = -1;
         goto out; 
@@ -481,8 +480,7 @@ int archive_unpack_handler(const struct io_read_wrapper *content, const struct a
 
     a = archive_read_new();
     if (a == NULL) {
-    	LOG_ERROR("archive read new failed\n");
-        fprintf(stderr, "archive read new failed\n");
+    	LOG_ERROR("archive read new failed");
         ret = -1;
         goto out;
     }
@@ -491,8 +489,7 @@ int archive_unpack_handler(const struct io_read_wrapper *content, const struct a
 
     ext = archive_write_disk_new();
     if (ext == NULL) {
-    	LOG_ERROR("archive write disk new failed\n");
-        fprintf(stderr, "archive write disk new failed\n");
+    	LOG_ERROR("archive write disk new failed");
         ret = -1;
         goto out;
     }
@@ -501,12 +498,13 @@ int archive_unpack_handler(const struct io_read_wrapper *content, const struct a
 
     ret = archive_read_open(a, mydata, NULL, read_content, NULL);
     if (ret != 0) {
-    	LOG_ERROR("Failed to open archive: %s\n", strerror(errno));
+    	LOG_ERROR("Failed to open archive: %s", strerror(errno));
         ret = -1;
         goto out;
     }
 
     wh_handle_cb = get_whiteout_convert_cb(options->whiteout_format);
+	int i = 0;
     for (;;) {
         free(dst_path);
         dst_path = NULL;
@@ -514,28 +512,26 @@ int archive_unpack_handler(const struct io_read_wrapper *content, const struct a
         if (ret == ARCHIVE_EOF) {
             break;
         }
-
+		
         if (ret != ARCHIVE_OK) {
-        	LOG_ERROR("Warning reading tar header: %s, %s\n", archive_error_string(a), strerror(archive_errno(a)));
-            (void)fprintf(stderr, "Warning reading tar header: %s, %s\n", archive_error_string(a),
-                          strerror(archive_errno(a)));
+        	LOG_ERROR("Warning reading tar header: %s, %s", archive_error_string(a), strerror(archive_errno(a)));
             ret = -1;
             goto out;
         }
-
+		i++;
         dst_path = update_entry_for_pathname(entry, options->src_base, options->dst_base);
         //printf("dst_path: %s\n", dst_path);
         if (dst_path == NULL) {
-        	LOG_ERROR("Failed to update pathname\n");
-            fprintf(stderr, "Failed to update pathname\n");
+        	LOG_ERROR("Failed to update pathname");
+            fprintf(stderr, "Failed to update pathname");
             ret = -1;
             goto out;
         }
 
         ret = rebase_hardlink(entry, options->src_base, options->dst_base);
         if (ret != 0) {
-        	LOG_ERROR("Failed to rebase hardlink\n");
-            fprintf(stderr, "Failed to rebase hardlink\n");
+        	LOG_ERROR("Failed to rebase hardlink");
+            fprintf(stderr, "Failed to rebase hardlink");
             ret = -1;
             goto out;
         }
@@ -548,26 +544,20 @@ int archive_unpack_handler(const struct io_read_wrapper *content, const struct a
 
         ret = archive_write_header(ext, entry);
         if (ret != ARCHIVE_OK) {
-        	LOG_ERROR("Fail to handle tar header: %s, %s\n", archive_error_string(ext), strerror(archive_errno(ext)));
-            (void)fprintf(stderr, "Fail to handle tar header: %s, %s\n", archive_error_string(ext),
-                          strerror(archive_errno(ext)));
+        	LOG_ERROR("Fail to handle tar header: %s, %s", archive_error_string(ext), strerror(archive_errno(ext)));
             ret = -1;
             goto out;
         } else if (archive_entry_size(entry) > 0) {
             ret = copy_data(a, ext);
             if (ret != ARCHIVE_OK) {
-            	LOG_ERROR("Failed to do copy tar data: %s, %s\n", archive_error_string(ext), strerror(archive_errno(ext)));
-                (void)fprintf(stderr, "Failed to do copy tar data: %s, %s\n", archive_error_string(ext),
-                              strerror(archive_errno(ext)));
+            	LOG_ERROR("Failed to do copy tar data: %s, %s", archive_error_string(ext), strerror(archive_errno(ext)));
                 ret = -1;
                 goto out;
             }
         }
         ret = archive_write_finish_entry(ext);
         if (ret != ARCHIVE_OK) {
-        	LOG_ERROR("Failed to freeing archive entry: %s, %s\n", archive_error_string(ext), strerror(archive_errno(ext)));
-            (void)fprintf(stderr, "Failed to freeing archive entry: %s, %s\n", archive_error_string(ext),
-                          strerror(archive_errno(ext)));
+        	LOG_ERROR("Failed to freeing archive entry: %s, %s", archive_error_string(ext), strerror(archive_errno(ext)));
             ret = -1;
             goto out;
         }
@@ -639,20 +629,20 @@ int archive_unpack(const struct io_read_wrapper *content, const char *dstdir, co
 
         // child process, dup2 pipe_for_read[1] to stderr,
         if (dup2(pipe_stderr[1], 2) < 0) { 
-        	LOG_ERROR("Dup fd error: %s\n", strerror(errno));
+        	LOG_ERROR("Dup fd error: %s", strerror(errno));
             ret = -1;
             goto child_out;
         }
 
         if (chroot(dstdir) != 0) { 
-        	LOG_ERROR("Failed to chroot to %s\n", dstdir);
+        	LOG_ERROR("Failed to chroot to %s", dstdir);
             fprintf(stderr, "Failed to chroot to %s: %s", dstdir, strerror(errno));
             ret = -1;
             goto child_out;
         }
 
         if (chdir("/") != 0) {
-        	LOG_ERROR("Failed to chroot to /\n");
+        	LOG_ERROR("Failed to chroot to /");
             fprintf(stderr, "Failed to chroot to /: %s", strerror(errno));
             ret = -1;
             goto child_out;
@@ -672,10 +662,10 @@ child_out:
 
     ret = wait_for_pid(pid);
     if (ret != 0) {
-    	LOG_ERROR("Wait archive_untar_handler failed with error:%s\n", strerror(errno));
+    	LOG_ERROR("Wait archive_untar_handler failed with error:%s", strerror(errno));
         fcntl(pipe_stderr[0], F_SETFL, O_NONBLOCK);
         if (read_nointr(pipe_stderr[0], errbuf, BUFSIZ) < 0) {
-        	LOG_ERROR("read error message from child failed\n");
+        	LOG_ERROR("read error message from child failed");
         }
     }
 
@@ -685,6 +675,50 @@ cleanup:
         *errmsg = strdup_s(errbuf);
     }
     return ret;
+}
+
+int archive_test_valid(const char *src) {
+	int ret = 0;
+	struct archive *a = NULL;
+	struct archive_entry *entry = NULL;
+	
+	a = archive_read_new();
+    if (a == NULL) {
+    	LOG_ERROR("archive read new failed");
+        ret = -1;
+        goto out;
+    }
+    archive_read_support_filter_all(a);
+    archive_read_support_format_all(a);
+#define DEFAULT_BLOCK_SIZE 512
+	ret = archive_read_open_filename(a, src, DEFAULT_BLOCK_SIZE);
+	if(ret != ARCHIVE_OK) {
+		ret = -1;
+		goto out;
+	}
+	
+	for(;;) {
+		ret = archive_read_next_header(a, &entry);
+        if (ret == ARCHIVE_EOF) {
+            break;
+        }
+		
+        if (ret != ARCHIVE_OK) {
+        	LOG_ERROR("test reading tar header: %s, %s failed", archive_error_string(a), strerror(archive_errno(a)));
+            ret = -1;
+            goto out;
+        }
+	}
+
+	ret = archive_read_free(a);
+	if(ret != ARCHIVE_OK) {
+		ret = -1;
+		goto out;
+	}
+	
+	ret = 0;
+out:
+	return ret;
 }
 
 static int archive_entry_parse(struct archive_entry *entry, struct archive *ar, int32_t position, Buffer *json_buf,

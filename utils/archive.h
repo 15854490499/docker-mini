@@ -25,6 +25,7 @@ struct archive_options {
 	const char *dst_base;
 };
 
+int archive_test_valid(const char *src);
 int archive_unpack(const struct io_read_wrapper *content, const char *dstdir, const struct archive_options *options, char **errmsg);
 int archive_unpack_handler(const struct io_read_wrapper *content, const struct archive_options *options);
 int archive_copy_oci_tar_split_and_ret_size(int src_fd, const char *dist_file, int64_t *ret_size);

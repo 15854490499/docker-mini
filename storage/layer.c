@@ -23,7 +23,6 @@ layer_store_metadata *g_metadata = NULL;
 
 #define g_root_dir "/var/lib/docker-mini/overlay-layers"
 #define g_run_dir "/var/lib/docker-mini/run"
-
 static int driver_create_layer(const char *id, const char *parent, bool writable, const struct layer_store_mount_opts *opt) {
 	struct driver_create_opts c_opts = { 0 };
 	int ret = 0;
@@ -360,24 +359,25 @@ int layer_store_delete(const char *id) {
 
 	l = lookup(id);
 	if(l == NULL) {
-		LOG_ERROR("layer %s not exists already, return success\n", id);
+		LOG_ERROR("layer %s not exists already, return success", id);
 		goto free_out;
 	}
 
 	if(umount_helper(l, true) != 0) {
 		ret = -1;
-		LOG_ERROR("Failed to umount layer %s\n", l->slayer->id);
+		LOG_ERROR("Failed to umount layer %s", l->slayer->id);
 		goto free_out;
 	}
+	
 	if(l->mount_point_json_path != NULL && path_remove(l->mount_point_json_path) != 0) {
-    	LOG_ERROR("Can not remove mount point file of layer %s, just ignore.\n", l->mount_point_json_path);
+    	LOG_ERROR("Can not remove mount point file of layer %s, just ignore.", l->mount_point_json_path);
     }
 
 	tspath = tar_split_path(l->slayer->id);
 	if(tspath != NULL && path_remove(tspath) != 0) {
-		LOG_ERROR("Can not remove layer files, just ignore\n");
+		LOG_ERROR("Can not remove layer files, just ignore");
 	}
-
+	
 	ret = remove_memory_stores(l->slayer->id);
 	if(ret != 0) {
 		goto free_out;
@@ -385,14 +385,16 @@ int layer_store_delete(const char *id) {
 
 	ret = graphdriver_rm_layer(l->slayer->id);
 	if(ret != 0) {
-		LOG_ERROR("Remove layer : %s by driver failed\n", l->slayer->id);
+		LOG_ERROR("Remove layer : %s by driver failed", l->slayer->id);
 		goto free_out;
 	}
 
 	ret = layer_store_remove_layer(l->slayer->id);
 
 free_out:
-	free(tspath);
+	if(tspath != NULL) {
+		free(tspath);
+	}
 	return ret;
 }
 
@@ -602,26 +604,26 @@ int layer_store_create(const char *id, const struct layer_opts *opts, const stru
 	}
 	ret = new_layer_by_opts(lid, opts);
 	if(ret != 0) {
-		goto free_out;
+		goto clear_resources;
 	}
 
 	l = lookup(lid);
 	if(l == NULL) {
 		ret = -1;
-		goto clear_memory;
+		goto clear_resources;
 	}
 	l->slayer->incomplete = true;
 	if(save_layer(l) != 0) {
 		ret = -1;
-		goto clear_memory;
+		goto clear_resources;
 	}
 	ret = apply_diff(l, diff);
 	if(ret != 0) {
-		goto clear_memory;
+		goto clear_resources;
 	}
 	ret = update_mount_point(l);
 	if(ret != 0) {
-		goto clear_memory;
+		goto clear_resources;
 	}
 	l->slayer->incomplete = false;
 	ret = save_layer(l);
@@ -634,8 +636,10 @@ int layer_store_create(const char *id, const struct layer_opts *opts, const stru
 		goto free_out;
 	}
 	LOG_ERROR("save layer failed\n");
-clear_memory:
-	remove_memory_stores(lid);
+
+clear_resources:
+	layer_store_delete(lid);
+
 free_out:
 	free(lid);
 	return ret;
@@ -714,7 +718,6 @@ static char *mount_helper(layer_t *l)
         return NULL;
     }
     if(l->smount_point->count > 0) {
-		printf("l->smount_point->count > 0\n");
         l->smount_point->count += 1;
         mount_point = strdup_s(l->smount_point->path);
         goto save_json;

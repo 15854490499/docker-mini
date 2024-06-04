@@ -834,13 +834,13 @@ static int64_t storage_img_cal_image_size(const char *image_id)
     struct layer *layer_info = NULL;
 
     if (image_id == NULL) {
-    	LOG_ERROR("Invalid arguments\n");
+    	LOG_ERROR("Invalid arguments");
         total_size = -1;
         goto out;
     }
 
     if (get_big_data_names(image_id, &big_data_names, &big_data_len) != 0) {
-    	LOG_ERROR("Failed to read image %s big datas\n", image_id);
+    	LOG_ERROR("Failed to read image %s big datas", image_id);
         total_size = -1;
         goto out;
     }
@@ -848,7 +848,7 @@ static int64_t storage_img_cal_image_size(const char *image_id)
     for (i = 0; i < big_data_len; i++) {
         int64_t tmp = get_big_data_size(image_id, big_data_names[i]);
         if (tmp == -1) {
-        	LOG_ERROR("Failed to read big data %s for image %s\n", big_data_names[i], image_id);
+        	LOG_ERROR("Failed to read big data %s for image %s", big_data_names[i], image_id);
             total_size = -1;
             goto out;
         }
@@ -857,7 +857,7 @@ static int64_t storage_img_cal_image_size(const char *image_id)
 
     layer_id = get_top_layer(image_id);
     if (layer_id == NULL) {
-    	LOG_ERROR("Failed to get top layer of image %s\n", image_id);
+    	LOG_ERROR("Failed to get top layer of image %s", image_id);
         total_size = -1;
         goto out;
     }
@@ -865,13 +865,13 @@ static int64_t storage_img_cal_image_size(const char *image_id)
     while (layer_id != NULL) {
         layer_info = layer_store_lookup(layer_id);
         if (layer_info == NULL) {
-        	LOG_ERROR("Failed to get layer info for layer %s\n", layer_id);
+        	LOG_ERROR("Failed to get layer info for layer %s", layer_id);
             total_size = -1;
             goto out;
         }
 
         if (layer_info->uncompress_size < 0 || layer_info->uncompressed_digest == NULL) {
-        	LOG_ERROR("size for layer %s unknown\n", layer_id);
+        	LOG_ERROR("size for layer %s unknown", layer_id);
             total_size = -1;
 			goto out;
         }
@@ -917,7 +917,7 @@ int storage_img_set_names(const char *img_id, const char **names, size_t names_l
 	image_t *img;
 
 	if(img_id == NULL) {
-		LOG_ERROR("invalid NULL pointer\n");
+		LOG_ERROR("invalid NULL pointer");
 		return -1;
 	}
 
@@ -939,12 +939,12 @@ static int set_load_time(const char *id, const types_timestamp_t *time)
     char timebuffer[TIME_STR_SIZE] = { 0x00 };
 
     if (id == NULL || time == NULL) {
-    	LOG_ERROR("Invalid input paratemers\n");
+    	LOG_ERROR("Invalid input paratemers");
         return -1;
     }    
 
     if (g_image_store == NULL) {
-    	LOG_ERROR("Image store is not ready\n");
+    	LOG_ERROR("Image store is not ready");
         return -1;
     }    
 
@@ -955,13 +955,13 @@ static int set_load_time(const char *id, const types_timestamp_t *time)
 
     img = lookup(id);
     if (img == NULL) {
-    	LOG_ERROR("image not known\n");
+    	LOG_ERROR("image not known");
         ret = -1;
         goto out; 
     }    
 
     if (!get_time_buffer(time, timebuffer, sizeof(timebuffer), false)) {
-    	LOG_ERROR("Failed to get time buffer\n");
+    	LOG_ERROR("Failed to get time buffer");
         ret = -1;
         goto out; 
     }    
@@ -969,7 +969,7 @@ static int set_load_time(const char *id, const types_timestamp_t *time)
     free(img->simage->loaded);
     img->simage->loaded = strdup_s(timebuffer);
     if (save_image(img->simage) != 0) { 
-    	LOG_ERROR("Failed to save image\n");
+    	LOG_ERROR("Failed to save image");
         ret = -1;
     }    
 
@@ -984,13 +984,13 @@ int storage_img_set_loaded_time(const char *img_id, types_timestamp_t *loaded_ti
     int ret = 0; 
 
     if (img_id == NULL || loaded_time == NULL) {
-    	LOG_ERROR("Invalid arguments\n");
+    	LOG_ERROR("Invalid arguments");
         ret = -1;
         goto out; 
     }    
 
     if (set_load_time(img_id, loaded_time) != 0) { 
-    	LOG_ERROR("Failed to set img %s loaded time\n", img_id);
+    	LOG_ERROR("Failed to set img %s loaded time", img_id);
         ret = -1;
         goto out; 
     }    
@@ -1003,13 +1003,13 @@ int storage_img_set_big_data(const char *img_id, const char *key, const char *va
 	int ret = 0;
 	
 	if(img_id == NULL || key == NULL || val == NULL) {
-		LOG_ERROR("Invalid arguments\n");
+		LOG_ERROR("Invalid arguments");
 		ret = -1;
 		goto out;
 	}
 
 	if(set_big_data(img_id, key, val) != 0) {
-		LOG_ERROR("Failed to set img %s big data %s=%s\n", img_id, key, val);
+		LOG_ERROR("Failed to set img %s big data %s=%s", img_id, key, val);
 		ret = -1;
 		goto out;
 	}
@@ -1068,17 +1068,15 @@ static int check_image_occupancy_status(const char *img_id, bool *in_using) {
 
 	all_rootfs = common_calloc_s(sizeof(struct rootfs_list));
 	if(all_rootfs == NULL) {
-		LOG_ERROR("Out of known");
+		LOG_ERROR("Out of memory");
 		ret = -1;
 		goto out;
 	}
-
 	if(rootfs_store_get_all_rootfs(all_rootfs) != 0) {
 		LOG_ERROR("Failed to get all container rootfs info");
 		ret = -1;
 		goto out;
 	}
-
 	for(i = 0; i < all_rootfs->rootfs_len; i++) {
 		if(strcmp(all_rootfs->rootfs[i]->image, img_id) == 0) {
 			LOG_ERROR("Image used by %s", all_rootfs->rootfs[i]->id);
@@ -1108,33 +1106,28 @@ int storage_img_delete(const char *img_id, bool commit) {
 		ret = 0;
 		goto out;
 	}
-
 	summary = storage_img_get_summary(img_id);
 	if(summary == NULL) {
 		LOG_ERROR("Failed to get image %s summary\n", img_id);
 		ret = -1;
 		goto out;
 	}
-	
 	if(check_image_occupancy_status(summary->id, &in_using) != 0) {
 		LOG_ERROR("Failed ro check image occupancy status\n");
 		ret = -1;
 		goto out;
 	}
-
 	if(delete_img_related_layers(summary->id, summary->top_layer)) {
 		LOG_ERROR("Failed to delete img related layer %s\n", img_id);
 		ret = -1;
 		goto out;
 	}
-
 	sprintf(img_path, "%s/%s", storage_dir, summary->id);
 	ret = recursive_remove_path(img_path);
 	if(ret < 0) {
 		ret = -1;
 		goto out;
 	}
-
 	img = delete_image(summary->id);
 	if(img == NULL) {
 		LOG_ERROR("Failed to delete img %s\n", img_id);
@@ -1573,13 +1566,11 @@ char *storage_rootfs_mount(const char *container_id)
     	LOG_ERROR("Invalid input arguments");
         goto out; 
     }    
-    
 	rootfs_info = rootfs_store_get_rootfs(container_id);
     if(rootfs_info == NULL) {
     	LOG_ERROR("Failed to get rootfs %s info", container_id);
         goto out; 
     }    
-
     mount_point = layer_store_mount(rootfs_info->layer);
     if(mount_point == NULL) {
     	LOG_ERROR("Failed to mount %s", rootfs_info->layer);

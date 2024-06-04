@@ -13,8 +13,8 @@ get_filename_component(img_proto_path "${img_proto}" PATH)
 # Generated sources
 set(cont_proto_srcs "${CMAKE_CURRENT_BINARY_DIR}/../../container.pb.cc")
 set(cont_proto_hdrs "${CMAKE_CURRENT_BINARY_DIR}/../../container.pb.h")
-set(cont_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/container.grpc.pb.cc")
-set(cont_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/container.grpc.pb.h")
+set(cont_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/../../container.grpc.pb.cc")
+set(cont_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/../../container.grpc.pb.h")
 add_custom_command(
       OUTPUT "${cont_proto_srcs}" "${cont_proto_hdrs}" "${cont_grpc_srcs}" "${cont_grpc_hdrs}"
       COMMAND ${_PROTOBUF_PROTOC}
@@ -27,8 +27,8 @@ add_custom_command(
 
 set(img_proto_srcs "${CMAKE_CURRENT_BINARY_DIR}/../../image.pb.cc")
 set(img_proto_hdrs "${CMAKE_CURRENT_BINARY_DIR}/../../image.pb.h")
-set(img_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/image.grpc.pb.cc")
-set(img_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/image.grpc.pb.h")
+set(img_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/../../image.grpc.pb.cc")
+set(img_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/../../image.grpc.pb.h")
 add_custom_command(
       OUTPUT "${img_proto_srcs}" "${img_proto_hdrs}" "${img_grpc_srcs}" "${img_grpc_hdrs}"
       COMMAND ${_PROTOBUF_PROTOC}

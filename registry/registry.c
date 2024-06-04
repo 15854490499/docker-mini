@@ -10,6 +10,7 @@
 #include "storage.h"
 #include "time.h"
 #include "log.h"
+#include "archive.h"
 
 #define MANIFEST_BIG_DATA_KEY "manifest"
 #define MAX_CONCURRENT_DOWNLOAD_NUM 5
@@ -670,6 +671,7 @@ static int fetch_data(pull_descriptor *desc, char *path, char *file, char *conte
 			//	goto out;
 			//}
 		}
+
 		break;
 	}
 out:
@@ -1096,6 +1098,7 @@ int fetch_layer(pull_descriptor* desc, size_t index) {
 	int sret = 0;
 	char file[PATH_MAX] = { 0 };
 	char path[PATH_MAX] = { 0 };
+	int retry_times = RETRY_TIMES;
 	layer_blob* layer = NULL;
 	if(index >= desc->layers_len) {
 		LOG_ERROR("Invalid layer index");
@@ -1113,10 +1116,20 @@ int fetch_layer(pull_descriptor* desc, size_t index) {
 		ret = -1;
 		goto out;
 	}
-	ret = fetch_data(desc, path, file, layer->media_type, layer->digest);
-	if(ret != 0) {
-		LOG_ERROR("registry: Get %s failed", path);
-		goto out;
+
+	while(retry_times--) {
+		ret = fetch_data(desc, path, file, layer->media_type, layer->digest);
+		if(ret != 0) {
+			LOG_ERROR("registry: Get %s failed", path);
+			goto out;
+		}
+
+		ret = archive_test_valid(file);
+		if(ret != 0) {
+			LOG_INFO("test archive gzip error, try fetch again");
+			continue;
+		}
+		break;
 	}
 out:
 	return ret;
@@ -1190,7 +1203,7 @@ static int register_layer(pull_descriptor *desc, size_t i) {
 
 	id = without_sha256_prefix(desc->layers[i].chain_id);
 	if(id == NULL) {
-		LOG_ERROR("layer %ld have NULL digest for image %s\n", i, desc->image_name);
+		LOG_ERROR("layer %ld have NULL digest for image %s", i, desc->image_name);
 		return -1;
 	}
 	
@@ -1202,7 +1215,7 @@ static int register_layer(pull_descriptor *desc, size_t i) {
 		.layer_data_path = desc->layers[i].file,
 	};
 	if(storage_layer_create(id, &copts) != 0) {
-		LOG_ERROR("create layer %s failed, parent %s, file %s\n", id, desc->parent_layer_id, desc->layers[i].file);
+		LOG_ERROR("create layer %s failed, parent %s, file %s", id, desc->parent_layer_id, desc->layers[i].file);
 		return -1;
 	}
 	desc->layers[i].registered = true;
@@ -1386,6 +1399,7 @@ static int fetch_all(pull_descriptor* desc) {
 	
 	if(desc->rollback_layers_on_failure && desc->cancel == true) {
 		LOG_ERROR("fetch failed and roll back");
+		ret = -1;
 		roll_back_on_fetch_failure(desc);
 	}
 
@@ -1533,7 +1547,7 @@ static int register_image(pull_descriptor* desc) {
 	}
 	ret = storage_img_set_image_size(image_id);
 	if(ret != 0) {
-		LOG_ERROR("set image size failed for %s failed", desc->image_name);
+		LOG_ERROR("set image size for %s failed", desc->image_name ? desc->image_name : "");
 		goto out;
 	}
 out:

@@ -284,12 +284,12 @@ inline bool abspath(const char *str) {
 	return *str == '/';
 }
 
-int safe_int(const char *numstr, int *converted) {
+static int safe_int_base(const char *numstr, int *converted, int base) {
 	char *err = NULL;
 	signed long int sli;
 
 	errno = 0;
-	sli = strtol(numstr, &err, 0);
+	sli = strtol(numstr, &err, base);
     if (errno == ERANGE && (sli == LONG_MAX || sli == LONG_MIN))
         return -ERANGE;
 
@@ -304,6 +304,14 @@ int safe_int(const char *numstr, int *converted) {
 
     *converted = (int)sli;
 	return 0;
+}
+
+int safe_int(const char *numstr, int *converted) {
+	return safe_int_base(numstr, converted, 0);
+}
+
+int safe_int_hex(const char *numstr, int *converted) {
+	return safe_int_base(numstr, converted, 16);
 }
 
 int safe_llong(const char *numstr, long long *converted)
@@ -342,6 +350,35 @@ int safe_strtod(const char *numstr, double *converted)
 
     *converted = ld; 
     return 0;
+}
+
+int safe_itoa(char *converted, int numstr) {
+	int cur = -1;
+	int tmp_size = 0;
+	char tmp_buf[PATH_MAX] = { 0x00 };
+
+	if(converted == NULL) {
+		LOG_ERROR("invalid Null ptr");
+		return -1;
+	}
+	
+	while(numstr != 0) {
+		tmp_buf[++cur] = numstr % 10 + '0';
+		numstr /= 10;
+	}
+	
+	while(cur >= 0) {
+		if((converted + tmp_size) == NULL) {
+			LOG_ERROR("invalid Null ptr");
+			return -1;
+		}
+		*(converted + tmp_size) = tmp_buf[cur--];
+		tmp_size++;
+	}
+	
+	*(converted + tmp_size) = 0;
+	return 0;
+
 }
 
 static int parse_unit_multiple(const char *unit, int64_t *mltpl) {
@@ -1460,6 +1497,7 @@ static int recursive_rmdir_helper(const char *dirpath, int recursive_depth, int 
     	LOG_ERROR("Failed to open %s\n", dirpath);
         return 1;
     }
+
     pdirent = readdir(directory);
     for (; pdirent != NULL; pdirent = readdir(directory)) {
         struct stat fstat;
@@ -1473,14 +1511,14 @@ static int recursive_rmdir_helper(const char *dirpath, int recursive_depth, int 
 
         pathname_len = snprintf(fname, PATH_MAX, "%s/%s", dirpath, pdirent->d_name);
         if (pathname_len < 0 || pathname_len >= PATH_MAX) {
-        	LOG_ERROR("Pathname too long\n");
+        	LOG_ERROR("Pathname too long");
             failure = 1;
             continue;
         }
 
         nret = lstat(fname, &fstat);
         if (nret) {
-        	LOG_ERROR("Failed to stat %s\n", fname);
+        	LOG_ERROR("Failed to stat %s", fname);
             failure = 1;
             continue;
         }
@@ -1492,13 +1530,13 @@ static int recursive_rmdir_helper(const char *dirpath, int recursive_depth, int 
         if (*saved_errno == 0) {
             *saved_errno = errno;
         }
-    	LOG_ERROR("Failed to delete %s\n", dirpath);
+    	LOG_ERROR("Failed to delete %s", dirpath);
         failure = 1;
     }
 
     nret = closedir(directory);
     if (nret) {
-    	LOG_ERROR("Failed to close directory %s\n", dirpath);
+    	LOG_ERROR("Failed to close directory %s", dirpath);
         failure = 1;
     }
 

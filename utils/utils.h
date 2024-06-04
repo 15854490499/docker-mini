@@ -82,6 +82,8 @@ int parse_size_int_and_float(const char *numstr, int64_t mlt, int64_t *converted
 int safe_strtod(const char *numstr, double *converted);
 int safe_llong(const char *numstr, long long *converted);
 int safe_int(const char *numstr, int *converted);
+int safe_int_hex(const char *numstr, int *converted);
+int safe_itoa(char *converted, int numstr);
 int generate_random_str(char *id, size_t len);
 
 int recursive_rmdir(const char *dirpath, int recursive_depth);

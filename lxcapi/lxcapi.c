@@ -332,6 +332,63 @@ out:
 	return ret;
 }
 
+static int add_ipv4_addr(struct lxc_params_list *lxc_conf) { 
+#define DEFAULT_STATIC_IPV4_SUBNET "192.168.0."
+#define DEFAULT_GATEWAY "192.168.0.1"
+	int ret = 0;
+	int i = 0;
+	int res = 0;
+	struct lxc_params_list *node = NULL;
+	char ipaddr[PATH_MAX] = { 0x00 };
+	char subip[PATH_MAX] = { 0x00 };
+	
+	memcpy(ipaddr, DEFAULT_STATIC_IPV4_SUBNET, strlen(DEFAULT_STATIC_IPV4_SUBNET));
+	
+	while(1) {
+		if(generate_random_str(subip + 2, 2)) {
+			LOG_ERROR("Failed to generate sub ip addr");
+			goto err_out;
+		}
+		if(!(subip[0] == '0' && (subip[1] == '0' || subip[1] == '1'))) {
+			break;
+		}
+	}
+	
+	subip[0] = '0';
+	subip[1] = 'x';
+	ret = safe_int_hex(subip, &res);
+	if(errno > 0) {
+		LOG_ERROR("convert subip %s to nums error", subip);
+		goto err_out;
+	}
+	
+	ret = safe_itoa(subip, res);
+	if(ret != 0) {
+		goto err_out;
+	}
+	
+	memcpy(ipaddr + strlen(DEFAULT_STATIC_IPV4_SUBNET), subip, strlen(subip));
+
+	node = create_lxc_list_node("lxc.net.0.ipv4.address", ipaddr);
+	if(node == NULL) {
+		goto err_out;
+	}
+	lxc_list_merge(lxc_conf, node);
+
+	node = create_lxc_list_node("lxc.net.0.ipv4.gateway", DEFAULT_GATEWAY);
+	if(node == NULL) {
+		goto err_out;
+	}
+	lxc_list_merge(lxc_conf, node);
+
+	goto out;
+
+err_out:
+	ret = -1;
+out:
+	return ret;
+}
+
 static int add_hw_addr(struct lxc_params_list *lxc_conf) { 
 	int ret = 0;
 	int i = 0;
@@ -392,7 +449,13 @@ static int add_lxc_network(struct lxc_params_list *lxc_conf) {
 		goto out;
 	}
 	lxc_list_merge(lxc_conf, node);
-
+	
+	ret = add_ipv4_addr(lxc_conf);
+	if(ret != 0) {
+		ret = -1;
+		goto out;
+	}
+	
 	ret = add_hw_addr(lxc_conf);
 	
 out:

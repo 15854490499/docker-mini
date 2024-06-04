@@ -364,7 +364,7 @@ int http_request(const char* url, struct http_get_options* options, long* respon
 	} else {}
 	curl_result = curl_easy_perform(curl_handle);
 	if(curl_result != CURLE_OK) {
-		LOG_ERROR("curl_result != CURLE_OK\n");
+		LOG_ERROR("curl_result != CURLE_OK");
 		check_buf_len(options, errbuf, curl_result);
 		ret = -1;
 	} else {
@@ -761,7 +761,7 @@ static int http_request_token(pull_descriptor *desc, challenge *c, char **output
 
 	ret = http_request(url, options, NULL, 0);
 	if(ret) {
-		LOG_ERROR("Failed to get http request: %s\n", options->errmsg);
+		LOG_ERROR("Failed to get http request: %s", options->errmsg);
 		ret = -1;
 		goto out;
 	}
@@ -907,7 +907,7 @@ int http_request_buf(pull_descriptor* desc, const char* url, const char** custom
 	if(custom_headers != NULL) {
 		options->custom_headers = str_array_dup(custom_headers, array_len(custom_headers));
 		if(options->custom_headers == NULL) {
-			LOG_ERROR("dup headers failed\n");
+			LOG_ERROR("dup headers failed");
 			ret = -1;
 			goto out;
 		}
@@ -918,7 +918,7 @@ int http_request_buf(pull_descriptor* desc, const char* url, const char** custom
 	options->timeout = true;
 	ret = http_request(url, options, NULL, 0);
 	if(ret) {
-		LOG_ERROR("Failed to get http request: %s\n", options->errmsg);
+		LOG_ERROR("Failed to get http request: %s", options->errmsg);
 		ret = -1;
 		goto out;
 	}

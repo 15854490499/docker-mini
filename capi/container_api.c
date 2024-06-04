@@ -528,7 +528,6 @@ static int do_attach_container(const char *id) {
 	}
 
 out:
-	
 	return ret;
 }
 

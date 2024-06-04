@@ -374,18 +374,10 @@ int overlay2_apply_diff(const char *id, const struct graphdriver *driver, const 
 		goto out;
 	}
 
-	layer_diff = path_join(layer_dir, OVERLAY_LAYER_DIFF);
-	if(layer_diff == NULL) {
-		LOG_ERROR("Failed to join layer diff dir : %s\n", id);
-		ret = -1;
-		goto out;
-	}
-
 	options.whiteout_format = OVERLAY_WHITEOUT_FORMATE;
-
 	ret = archive_unpack(content, layer_diff, &options, &err);
 	if(ret != 0) {
-		LOG_ERROR("Failed to unpack to %s : %s\n", layer_diff, err);
+		LOG_ERROR("Failed to unpack to %s : %s", layer_diff, err);
 		ret = -1;
 		goto out;
 	}
@@ -934,7 +926,7 @@ static int do_create(const char *id, const char *parent, const struct graphdrive
 
 	layer_dir = path_join(driver->home, id);
 	if(layer_dir == NULL) {
-		LOG_ERROR("Failed to join layer dir: %s\n", id);
+		LOG_ERROR("Failed to join layer dir: %s", id);
 		ret = -1;
 		goto out;
 	}
@@ -945,14 +937,14 @@ static int do_create(const char *id, const char *parent, const struct graphdrive
 	}
 
 	if(mkdir_p(layer_dir, 0777) != 0) {
-		LOG_ERROR("Unable to create layer directory %s.\n", layer_dir);
+		LOG_ERROR("Unable to create layer directory %s.", layer_dir);
 		ret = -1;
 		goto out;
 	}
 
 	if(create_opts->storage_opt != NULL && create_opts->storage_opt->len != 0) {
 		if(set_layer_quota(layer_dir, create_opts->storage_opt, driver) != 0) {
-			LOG_ERROR("Unable to set layer quota %s\n", layer_dir);
+			LOG_ERROR("Unable to set layer quota %s", layer_dir);
 			ret = -1;
 			goto err_out;
 		}
@@ -967,7 +959,7 @@ static int do_create(const char *id, const char *parent, const struct graphdrive
 
 err_out:
 	if(recursive_rmdir(layer_dir, 0)) {
-		LOG_ERROR("Failed to delete layer path: %s\n", layer_dir);
+		LOG_ERROR("Failed to delete layer path: %s", layer_dir);
 	}
 out:
 	free(layer_dir);
@@ -1451,31 +1443,31 @@ int overlay2_umount_layer(const char *id, const struct graphdriver *driver) {
 	char *layer_dir = NULL;
 
 	if(id == NULL || driver == NULL) {
-		LOG_ERROR("Invalid input arguments\n");
+		LOG_ERROR("Invalid input arguments");
 		return -1;
 	}
 
 	layer_dir = path_join(driver->home, id);
 	if(layer_dir == NULL) {
-		LOG_ERROR("Failed to join layer dir : %s\n", id);
+		LOG_ERROR("Failed to join layer dir : %s", id);
 		ret = -1;
 		goto out;
 	}
 	
 	if(!dir_exists(layer_dir)) {
-		LOG_ERROR("layer dir %s not exist\n", layer_dir);
+		LOG_ERROR("layer dir %s not exist", layer_dir);
 		goto out;
 	}
 	
 	merged_dir = path_join(layer_dir, OVERLAY_LAYER_MERGED);
 	if(merged_dir == NULL) {
-		LOG_ERROR("Failed to join layer merged dir : %s\n", layer_dir);
+		LOG_ERROR("Failed to join layer merged dir : %s", layer_dir);
 		ret = -1;
 		goto out;
 	}
 	
-	if(umount2(merged_dir, MNT_DETACH) && errno != EINVAL) {
-		LOG_ERROR("Failed to umount the target : %s\n", merged_dir);
+	if(dir_exists(merged_dir) && umount2(merged_dir, MNT_DETACH) && errno != EINVAL) {
+		LOG_ERROR("Failed to umount the target : %s for %s", merged_dir, strerror(errno));
 	}
 out:
 	free(layer_dir);
@@ -1488,12 +1480,11 @@ int graphdriver_umount_layer(const char *id)
     int ret = 0;
 
     if (id == NULL) {
-    	LOG_ERROR("Invalid input arguments for driver mount layer\n");
+    	LOG_ERROR("Invalid input arguments for driver mount layer");
         return 0;
     }
 
     ret = g_driver.ops->umount_layer(id, &g_driver);
-
 
     return ret;
 }
@@ -1547,7 +1538,7 @@ int graphdriver_rm_layer(const char *id) {
 	int ret = 0;
 
 	if(id == NULL) {
-		LOG_ERROR("Invalid input arguments for driver remove layer\n");
+		LOG_ERROR("Invalid input arguments for driver remove layer");
 		return -1;
 	}
 

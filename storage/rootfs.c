@@ -183,7 +183,7 @@ static storage_rootfs *new_storage_rootfs(const char *id, const char *image, con
 
 out:
     if (ret != 0) { 
-        free(c);
+        free_storage_rootfs(c);
         c = NULL;
     }    
     return c;
@@ -193,9 +193,10 @@ static void free_rootfs_t(cntrootfs_t *ptr) {
 	if(ptr == NULL) {
 		return;
 	}
-	free(ptr->srootfs);
+	free_storage_rootfs(ptr->srootfs);
 	ptr->srootfs = NULL;
 	free(ptr);
+	ptr = NULL;
 }
 
 static cntrootfs_t *create_empty_cntr()
@@ -312,6 +313,7 @@ int rootfs_store_get_all_rootfs(struct rootfs_list *all_rootfs) {
 	all_rootfs->rootfs = (storage_rootfs**)malloc(sizeof(storage_rootfs*) * g_rootfs_store->rootfs_list_len);
 	while(item != NULL) {
 		all_rootfs->rootfs[i++] = item->cntr->srootfs;
+		item = item->next;
 	}
 
 	all_rootfs->rootfs_len = g_rootfs_store->rootfs_list_len;
@@ -341,6 +343,8 @@ static int remove_rootfs_from_memory(char *id) {
 	free(d->rootfs_id);
 	free(d->layer);
 	free_array_by_len(d->names, d->names_len);
+	free(d);
+	g_rootfs_store->rootfs_list_len--;
 	return 0;
 }
 
@@ -380,7 +384,6 @@ int delete_rootfs_from_store(const char *id) {
 		LOG_ERROR("Rootfs store is not ready\n");
 		return -1;
 	}
-
 	cntr = lookup(id);
 	if(cntr == NULL) {
 		LOG_ERROR("Rootfs %s not known\n", id);
@@ -392,12 +395,11 @@ int delete_rootfs_from_store(const char *id) {
 		ret = -1;
 		goto out;
 	}
-
 	if(remove_rootfs_dir(cntr->srootfs->id) != 0) {
-		LOG_ERROR("Failed to delete rootfs directory\n");
+		LOG_ERROR("Failed to delete rootfs directory, please manual delete it\n");
 		ret = -1;
-		goto out;
 	}
+	free_rootfs_t(cntr);
 out:
 	return ret;
 }

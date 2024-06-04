@@ -4,8 +4,8 @@ Simple Docker
 ===============
 Linux下对于docker容器引擎的简单模拟
 
-* [原作地址](https://www.lanqiao.cn/courses/608)
 * [参考项目](https://gitee.com/openeuler/iSulad)
+* [参考项目](https://www.lanqiao.cn/courses/608)
 * [参考项目](https://gitee.com/calvinwilliams/cocker)
 
 介绍
@@ -210,7 +210,7 @@ Linux下对于docker容器引擎的简单模拟
 	```C++
 	user  root;
 	```
-	3. 启动nginx，在宿主机内连接容器nginx，http:192.168.0.100:80，结果如图。  
+	3. 启动nginx，在宿主机内连接容器nginx，http:192.168.0.xxx:80，结果如图。  
 	![nginx.jpg](https://github.com/15854490499/docker-mini/blob/main/nginx.png) 
 
 * 连接容器
